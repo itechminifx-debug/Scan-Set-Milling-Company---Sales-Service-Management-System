@@ -55,6 +55,7 @@
         .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 600; }
         .badge-present { background: #d4edda; color: #155724; }
         .badge-absent { background: #f8d7da; color: #721c24; }
+        .badge-unmarked { background: #e2e8f0; color: #4a5568; }
 
         .btn {
             padding: 10px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
@@ -72,6 +73,11 @@
 
         .week-nav { display: flex; gap: 8px; justify-content: center; align-items: center; }
         .week-nav button { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; background: white; font-size: 13px; }
+
+        .unmarked-count {
+            background: #fef3c7; padding: 10px 14px; border-radius: 8px;
+            text-align: center; margin-bottom: 15px; color: #92400e; font-weight: 600; font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -88,14 +94,19 @@
             📅 <span id="currentDate"></span>
         </div>
 
+        <!-- Unmarked Count -->
+        <div class="unmarked-count" id="unmarkedBanner" style="display:none;">
+            ⚠️ <span id="unmarkedCount">0</span> worker(s) not yet marked for today
+        </div>
+
         <!-- Quick Attendance -->
         <div class="card">
             <h3>✅ Mark Today's Attendance</h3>
             <div class="worker-list" id="attendanceList">
                 <p style="color:#999;text-align:center;">Loading workers...</p>
             </div>
-            <div style="margin-top:15px;display:flex;gap:10px;">
-                <button class="btn btn-success" onclick="markAllPresent()">✅ All Present</button>
+            <div style="margin-top:15px;display:flex;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-success" onclick="markAllPresent()">✅ Mark All Present</button>
                 <button class="btn btn-primary" onclick="saveAttendance()">💾 Save Attendance</button>
             </div>
         </div>
@@ -111,7 +122,7 @@
             <div style="overflow-x:auto;margin-top:10px;">
                 <table id="weeklyTable">
                     <thead id="weeklyHeader"></thead>
-                    <tbody id="weeklyBody"><tr><td colspan="8" style="text-align:center;">Loading...</td></tr></tbody>
+                    <tbody id="weeklyBody"><tr><td colspan="9" style="text-align:center;">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -126,7 +137,7 @@
 
         function getWeekStart(date) {
             var d = new Date(date);
-            var day = d.getDay(); // 0=Sun
+            var day = d.getDay();
             d.setDate(d.getDate() - day);
             return d;
         }
@@ -166,23 +177,49 @@
             var attData = getAttendanceData();
             var todayRecords = attData.filter(function(a) { return a.date === today; });
 
+            // ✅ ONLY load saved records - do NOT auto-mark present
             attendance = {};
-            todayRecords.forEach(function(r) { attendance[r.workerName] = r.present; });
+            todayRecords.forEach(function(r) { 
+                attendance[r.workerName] = r.present; 
+            });
 
             var list = document.getElementById('attendanceList');
             if (workers.length === 0) {
                 list.innerHTML = '<p style="color:#999;text-align:center;">No workers added. Go to Admin Panel to add workers.</p>';
+                document.getElementById('unmarkedBanner').style.display = 'none';
                 return;
+            }
+
+            // Count unmarked workers
+            var unmarked = 0;
+            workers.forEach(function(w) {
+                if (!attendance.hasOwnProperty(w.name)) unmarked++;
+            });
+
+            if (unmarked > 0) {
+                document.getElementById('unmarkedBanner').style.display = 'block';
+                document.getElementById('unmarkedCount').textContent = unmarked;
+            } else {
+                document.getElementById('unmarkedBanner').style.display = 'none';
             }
 
             var html = '';
             workers.forEach(function(w) {
-                var isPresent = attendance[w.name] !== undefined ? attendance[w.name] : true;
+                var isMarked = attendance.hasOwnProperty(w.name);
+                var isPresent = isMarked ? attendance[w.name] : null;
+
                 html += '<div class="worker-row">';
                 html += '<span class="worker-name">👷 ' + w.name + '</span>';
                 html += '<div class="worker-status">';
-                html += '<button class="toggle-btn ' + (isPresent ? 'present' : '') + '" id="btn_' + w.name.replace(/\s/g,'_') + '_p" onclick="toggleAttendance(\'' + w.name + '\', true)">✅ Present</button>';
-                html += '<button class="toggle-btn ' + (!isPresent ? 'absent' : '') + '" id="btn_' + w.name.replace(/\s/g,'_') + '_a" onclick="toggleAttendance(\'' + w.name + '\', false)">❌ Absent</button>';
+
+                // Present button
+                var presentClass = isMarked && isPresent ? 'present' : '';
+                html += '<button class="toggle-btn ' + presentClass + '" onclick="toggleAttendance(\'' + w.name + '\', true)">✅ Present</button>';
+
+                // Absent button
+                var absentClass = isMarked && !isPresent ? 'absent' : '';
+                html += '<button class="toggle-btn ' + absentClass + '" onclick="toggleAttendance(\'' + w.name + '\', false)">❌ Absent</button>';
+
                 html += '</div></div>';
             });
             list.innerHTML = html;
@@ -197,7 +234,7 @@
             var workers = getWorkers();
             workers.forEach(function(w) { attendance[w.name] = true; });
             loadTodayAttendance();
-            showToast('All workers marked present!');
+            showToast('All workers marked present! Click Save to record.');
         }
 
         function saveAttendance() {
@@ -209,8 +246,9 @@
                 attData.push({ workerName: name, date: today, present: attendance[name] });
             });
             saveAttendanceData(attData);
+            loadTodayAttendance();
             loadWeeklyAttendance();
-            showToast('✅ Attendance saved!');
+            showToast('✅ Attendance saved for today!');
         }
 
         function loadWeeklyAttendance() {
@@ -238,9 +276,14 @@
                 var daysPresent = 0;
                 weekDates.forEach(function(date) {
                     var record = attData.find(function(a) { return a.workerName === w.name && a.date === date; });
-                    var present = record ? record.present : false;
-                    if (present) daysPresent++;
-                    bHtml += '<td style="text-align:center;"><span class="badge ' + (present ? 'badge-present' : 'badge-absent') + '">' + (present ? '✓' : '✗') + '</span></td>';
+                    if (record && record.present) {
+                        daysPresent++;
+                        bHtml += '<td style="text-align:center;"><span class="badge badge-present">✓</span></td>';
+                    } else if (record && !record.present) {
+                        bHtml += '<td style="text-align:center;"><span class="badge badge-absent">✗</span></td>';
+                    } else {
+                        bHtml += '<td style="text-align:center;"><span class="badge badge-unmarked">-</span></td>';
+                    }
                 });
                 bHtml += '<td><strong>' + daysPresent + '/7</strong></td></tr>';
             });
