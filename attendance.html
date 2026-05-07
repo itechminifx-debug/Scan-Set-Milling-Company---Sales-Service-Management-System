@@ -44,10 +44,11 @@
         .worker-row.marked-absent { background: #f8d7da; border-color: #c0392b; }
 
         .worker-name { font-weight: 600; color: var(--text); font-size: 15px; }
-        .worker-status { display: flex; gap: 6px; align-items: center; }
-        .worker-status .status-text { font-size: 12px; font-weight: 600; margin-right: 8px; }
+        .worker-status-group { display: flex; gap: 6px; align-items: center; }
+        .status-text { font-size: 12px; font-weight: 600; margin-right: 8px; min-width: 80px; text-align: right; }
         .status-present { color: #155724; }
         .status-absent { color: #721c24; }
+        .status-unmarked { color: #999; }
 
         .mark-btn {
             padding: 8px 16px; border: 2px solid var(--border); border-radius: 20px;
@@ -63,7 +64,6 @@
             cursor: pointer; color: white; transition: all 0.2s;
         }
         .btn-success { background: var(--success); width: 100%; }
-        .btn-primary { background: var(--primary); }
 
         .toast {
             position: fixed; bottom: 20px; left: 20px; right: 20px;
@@ -73,10 +73,11 @@
         @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
         .summary-row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
-        .summary-item { background: #f0fdf4; padding: 10px 16px; border-radius: 8px; font-size: 13px; }
+        .summary-item { padding: 10px 16px; border-radius: 8px; font-size: 13px; }
 
         @media (max-width: 500px) {
             .worker-row { flex-direction: column; gap: 10px; text-align: center; }
+            .worker-status-group { justify-content: center; }
         }
     </style>
 </head>
@@ -89,17 +90,13 @@
 
     <div class="container">
 
-        <!-- Date Banner -->
-        <div class="date-banner">
-            📅 <span id="currentDate"></span>
-        </div>
+        <div class="date-banner">📅 <span id="currentDate"></span></div>
 
-        <!-- Attendance Marking -->
         <div class="card">
             <h3>📝 Mark Today's Attendance</h3>
             
             <div class="summary-row">
-                <div class="summary-item">👷 Total Workers: <strong id="totalWorkers">0</strong></div>
+                <div class="summary-item" style="background:#f0fdf4;">👷 Total: <strong id="totalWorkers">0</strong></div>
                 <div class="summary-item" style="background:#d4edda;">✅ Present: <strong id="countPresent">0</strong></div>
                 <div class="summary-item" style="background:#f8d7da;">❌ Absent: <strong id="countAbsent">0</strong></div>
                 <div class="summary-item" style="background:#fefce8;">⬜ Unmarked: <strong id="countUnmarked">0</strong></div>
@@ -114,12 +111,11 @@
             </div>
         </div>
 
-        <!-- Recent Attendance Records -->
         <div class="card">
-            <h3>📋 Recent Attendance Records</h3>
+            <h3>📋 Recent Records</h3>
             <div style="overflow-x:auto;">
                 <table style="width:100%;border-collapse:collapse;font-size:12px;">
-                    <thead><tr style="background:var(--primary);color:white;"><th style="padding:8px;text-align:left;">Date</th><th style="padding:8px;text-align:left;">Worker</th><th style="padding:8px;text-align:left;">Status</th></tr></thead>
+                    <thead><tr style="background:var(--primary);color:white;"><th style="padding:8px;">Date</th><th style="padding:8px;">Worker</th><th style="padding:8px;">Status</th></tr></thead>
                     <tbody id="recentRecords"><tr><td colspan="3" style="text-align:center;color:#999;padding:15px;">No records yet</td></tr></tbody>
                 </table>
             </div>
@@ -130,7 +126,7 @@
 
     <script>
         var today = new Date().toLocaleDateString();
-        var attendance = {}; // { workerName: true/false }
+        var attendance = {};
 
         function getWorkers() {
             var saved = localStorage.getItem('milling_workers');
@@ -157,13 +153,8 @@
             var attData = getAttendanceData();
             var todayRecords = attData.filter(function(a) { return a.date === today; });
 
-            // Reset attendance
             attendance = {};
-            
-            // Load saved records for today
-            todayRecords.forEach(function(r) { 
-                attendance[r.workerName] = r.present; 
-            });
+            todayRecords.forEach(function(r) { attendance[r.workerName] = r.present; });
 
             var list = document.getElementById('attendanceList');
             if (workers.length === 0) {
@@ -176,48 +167,81 @@
             workers.forEach(function(w) {
                 var isMarked = attendance.hasOwnProperty(w.name);
                 var isPresent = isMarked ? attendance[w.name] : null;
-                
                 var rowClass = '';
                 var statusHTML = '';
-                
+
                 if (isMarked) {
                     rowClass = isPresent ? 'marked-present' : 'marked-absent';
                     statusHTML = '<span class="status-text ' + (isPresent ? 'status-present' : 'status-absent') + '">' + (isPresent ? '✅ Present' : '❌ Absent') + '</span>';
                 } else {
-                    statusHTML = '<span class="status-text" style="color:#999;">⬜ Not marked</span>';
+                    statusHTML = '<span class="status-text status-unmarked">⬜ Not marked</span>';
                 }
-                
+
                 html += '<div class="worker-row ' + rowClass + '" id="row_' + w.name.replace(/\s/g,'_') + '">';
                 html += '<span class="worker-name">👷 ' + w.name + '</span>';
-                html += '<div class="worker-status">';
+                html += '<div class="worker-status-group">';
                 html += statusHTML;
-                html += '<button class="mark-btn ' + (isMarked && isPresent ? 'present-active' : '') + '" onclick="markWorker(\'' + w.name + '\', true)">✅ Present</button>';
-                html += '<button class="mark-btn ' + (isMarked && !isPresent ? 'absent-active' : '') + '" onclick="markWorker(\'' + w.name + '\', false)">❌ Absent</button>';
+                html += '<button class="mark-btn ' + (isMarked && isPresent ? 'present-active' : '') + '" data-worker="' + w.name.replace(/"/g, '&quot;') + '" data-status="present">✅ Present</button>';
+                html += '<button class="mark-btn ' + (isMarked && !isPresent ? 'absent-active' : '') + '" data-worker="' + w.name.replace(/"/g, '&quot;') + '" data-status="absent">❌ Absent</button>';
                 html += '</div></div>';
             });
 
             list.innerHTML = html;
+
+            // Add click events to all buttons
+            var allButtons = list.querySelectorAll('.mark-btn');
+            allButtons.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var workerName = this.getAttribute('data-worker');
+                    var status = this.getAttribute('data-status');
+                    markWorker(workerName, status === 'present');
+                });
+            });
+
             updateCounts();
         }
 
         function markWorker(name, present) {
             attendance[name] = present;
-            loadTodayAttendance(); // Refresh display
+            var safeName = name.replace(/\s/g, '_');
+            var row = document.getElementById('row_' + safeName);
+
+            if (row) {
+                row.classList.remove('marked-present', 'marked-absent');
+                if (present) { row.classList.add('marked-present'); }
+                else { row.classList.add('marked-absent'); }
+
+                var statusSpan = row.querySelector('.status-text');
+                if (statusSpan) {
+                    if (present) {
+                        statusSpan.textContent = '✅ Present';
+                        statusSpan.className = 'status-text status-present';
+                    } else {
+                        statusSpan.textContent = '❌ Absent';
+                        statusSpan.className = 'status-text status-absent';
+                    }
+                }
+
+                var buttons = row.querySelectorAll('.mark-btn');
+                if (buttons.length >= 2) {
+                    buttons[0].classList.remove('present-active');
+                    buttons[1].classList.remove('absent-active');
+                    if (present) { buttons[0].classList.add('present-active'); }
+                    else { buttons[1].classList.add('absent-active'); }
+                }
+            }
+
+            updateCounts();
         }
 
         function updateCounts() {
             var workers = getWorkers();
             var present = 0, absent = 0, unmarked = 0;
-            
             workers.forEach(function(w) {
                 if (attendance.hasOwnProperty(w.name)) {
-                    if (attendance[w.name]) present++;
-                    else absent++;
-                } else {
-                    unmarked++;
-                }
+                    if (attendance[w.name]) present++; else absent++;
+                } else { unmarked++; }
             });
-            
             document.getElementById('totalWorkers').textContent = workers.length;
             document.getElementById('countPresent').textContent = present;
             document.getElementById('countAbsent').textContent = absent;
@@ -227,11 +251,7 @@
         function saveAttendance() {
             var workers = getWorkers();
             var attData = getAttendanceData();
-            
-            // Remove today's existing records
             attData = attData.filter(function(a) { return a.date !== today; });
-            
-            // Add new records for marked workers
             var savedCount = 0;
             workers.forEach(function(w) {
                 if (attendance.hasOwnProperty(w.name)) {
@@ -239,7 +259,6 @@
                     savedCount++;
                 }
             });
-            
             saveAttendanceData(attData);
             loadRecentRecords();
             showToast('✅ Attendance saved! ' + savedCount + ' worker(s) recorded.');
@@ -249,7 +268,6 @@
             var attData = getAttendanceData();
             attData.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
             var recent = attData.slice(0, 20);
-            
             var tbody = document.getElementById('recentRecords');
             var html = '';
             recent.forEach(function(r) {
