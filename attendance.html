@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worker Attendance | Scan Set Milling</title>
+    <style>
+        :root {
+            --primary: #5d3a1a; --primary-light: #8b5e3c; --accent: #d4a574;
+            --bg: #fdf6f0; --card: #fff; --text: #3d2b1f; --text-light: #7a6a5c; --border: #e8d5c4;
+            --success: #2d6a4f; --warning: #c97a2a; --danger: #c0392b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: var(--bg); min-height: 100vh; padding-bottom: 40px; }
+
+        .navbar {
+            background: linear-gradient(135deg, #5d3a1a, #8b5e3c); color: white;
+            padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .navbar .brand { font-size: 18px; font-weight: 700; }
+        .navbar a { color: white; text-decoration: none; font-size: 13px; background: rgba(255,255,255,0.15); padding: 7px 14px; border-radius: 6px; }
+
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+
+        .date-banner {
+            background: var(--primary); color: white; padding: 16px 20px; border-radius: 14px;
+            text-align: center; margin-bottom: 20px; font-size: 18px; font-weight: 600;
+        }
+
+        .card {
+            background: var(--card); border-radius: 16px; padding: 22px;
+            margin-bottom: 18px; box-shadow: 0 3px 15px rgba(0,0,0,0.06);
+        }
+        .card h3 { color: var(--primary); font-size: 18px; margin-bottom: 16px; }
+
+        .worker-list { display: grid; gap: 10px; }
+        .worker-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 16px; background: #fdf9f5; border-radius: 10px; border: 1px solid var(--border);
+        }
+        .worker-name { font-weight: 600; color: var(--text); font-size: 15px; }
+        .worker-status { display: flex; gap: 8px; align-items: center; }
+        .toggle-btn {
+            padding: 8px 18px; border: 2px solid var(--border); border-radius: 20px;
+            font-weight: 600; cursor: pointer; font-size: 13px; transition: all 0.2s;
+            background: white; color: var(--text-light);
+        }
+        .toggle-btn.present { background: #d4edda; color: #155724; border-color: #155724; }
+        .toggle-btn.absent { background: #f8d7da; color: #721c24; border-color: #721c24; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+        table th { background: var(--primary); color: white; padding: 10px 8px; text-align: left; font-size: 10px; text-transform: uppercase; }
+        table td { padding: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+        .badge-present { background: #d4edda; color: #155724; }
+        .badge-absent { background: #f8d7da; color: #721c24; }
+
+        .btn {
+            padding: 10px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+            cursor: pointer; color: white; transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); }
+        .btn-success { background: var(--success); }
+
+        .toast {
+            position: fixed; bottom: 20px; left: 20px; right: 20px;
+            background: var(--success); color: white; padding: 15px; border-radius: 12px;
+            text-align: center; z-index: 1000; display: none; animation: slideUp 0.3s;
+        }
+        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .week-nav { display: flex; gap: 8px; justify-content: center; align-items: center; }
+        .week-nav button { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; background: white; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="brand">👷 Worker Attendance</div>
+        <a href="dashboard.html">🔙 Dashboard</a>
+    </div>
+
+    <div class="container">
+
+        <!-- Date Banner -->
+        <div class="date-banner">
+            📅 <span id="currentDate"></span>
+        </div>
+
+        <!-- Quick Attendance -->
+        <div class="card">
+            <h3>✅ Mark Today's Attendance</h3>
+            <div class="worker-list" id="attendanceList">
+                <p style="color:#999;text-align:center;">Loading workers...</p>
+            </div>
+            <div style="margin-top:15px;display:flex;gap:10px;">
+                <button class="btn btn-success" onclick="markAllPresent()">✅ All Present</button>
+                <button class="btn btn-primary" onclick="saveAttendance()">💾 Save Attendance</button>
+            </div>
+        </div>
+
+        <!-- This Week's Attendance -->
+        <div class="card">
+            <h3>📋 This Week's Attendance</h3>
+            <div class="week-nav">
+                <button onclick="changeWeek(-1)">◀ Previous</button>
+                <span id="weekLabel" style="font-weight:600;"></span>
+                <button onclick="changeWeek(1)">Next ▶</button>
+            </div>
+            <div style="overflow-x:auto;margin-top:10px;">
+                <table id="weeklyTable">
+                    <thead id="weeklyHeader"></thead>
+                    <tbody id="weeklyBody"><tr><td colspan="8" style="text-align:center;">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        var today = new Date().toLocaleDateString();
+        var currentWeekStart = getWeekStart(new Date());
+        var attendance = {};
+
+        function getWeekStart(date) {
+            var d = new Date(date);
+            var day = d.getDay(); // 0=Sun
+            d.setDate(d.getDate() - day);
+            return d;
+        }
+
+        function getWeekDates(start) {
+            var dates = [];
+            for (var i = 0; i < 7; i++) {
+                var d = new Date(start);
+                d.setDate(d.getDate() + i);
+                dates.push(d.toLocaleDateString());
+            }
+            return dates;
+        }
+
+        window.onload = function() {
+            document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            loadTodayAttendance();
+            loadWeeklyAttendance();
+        };
+
+        function getWorkers() {
+            var saved = localStorage.getItem('milling_workers');
+            return saved ? JSON.parse(saved) : [];
+        }
+
+        function getAttendanceData() {
+            var saved = localStorage.getItem('milling_attendance');
+            return saved ? JSON.parse(saved) : [];
+        }
+
+        function saveAttendanceData(data) {
+            localStorage.setItem('milling_attendance', JSON.stringify(data));
+        }
+
+        function loadTodayAttendance() {
+            var workers = getWorkers();
+            var attData = getAttendanceData();
+            var todayRecords = attData.filter(function(a) { return a.date === today; });
+
+            attendance = {};
+            todayRecords.forEach(function(r) { attendance[r.workerName] = r.present; });
+
+            var list = document.getElementById('attendanceList');
+            if (workers.length === 0) {
+                list.innerHTML = '<p style="color:#999;text-align:center;">No workers added. Go to Admin Panel to add workers.</p>';
+                return;
+            }
+
+            var html = '';
+            workers.forEach(function(w) {
+                var isPresent = attendance[w.name] !== undefined ? attendance[w.name] : true;
+                html += '<div class="worker-row">';
+                html += '<span class="worker-name">👷 ' + w.name + '</span>';
+                html += '<div class="worker-status">';
+                html += '<button class="toggle-btn ' + (isPresent ? 'present' : '') + '" id="btn_' + w.name.replace(/\s/g,'_') + '_p" onclick="toggleAttendance(\'' + w.name + '\', true)">✅ Present</button>';
+                html += '<button class="toggle-btn ' + (!isPresent ? 'absent' : '') + '" id="btn_' + w.name.replace(/\s/g,'_') + '_a" onclick="toggleAttendance(\'' + w.name + '\', false)">❌ Absent</button>';
+                html += '</div></div>';
+            });
+            list.innerHTML = html;
+        }
+
+        function toggleAttendance(name, present) {
+            attendance[name] = present;
+            loadTodayAttendance();
+        }
+
+        function markAllPresent() {
+            var workers = getWorkers();
+            workers.forEach(function(w) { attendance[w.name] = true; });
+            loadTodayAttendance();
+            showToast('All workers marked present!');
+        }
+
+        function saveAttendance() {
+            var attData = getAttendanceData();
+            // Remove today's records
+            attData = attData.filter(function(a) { return a.date !== today; });
+            // Add new records
+            Object.keys(attendance).forEach(function(name) {
+                attData.push({ workerName: name, date: today, present: attendance[name] });
+            });
+            saveAttendanceData(attData);
+            loadWeeklyAttendance();
+            showToast('✅ Attendance saved!');
+        }
+
+        function loadWeeklyAttendance() {
+            var workers = getWorkers();
+            var attData = getAttendanceData();
+            var weekDates = getWeekDates(currentWeekStart);
+            var weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+
+            document.getElementById('weekLabel').textContent = currentWeekStart.toLocaleDateString() + ' - ' + weekEnd.toLocaleDateString();
+
+            var header = document.getElementById('weeklyHeader');
+            var body = document.getElementById('weeklyBody');
+
+            var hHtml = '<tr><th>Worker</th>';
+            ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(function(d, i) {
+                hHtml += '<th>' + d + '<br><small>' + weekDates[i].slice(0,5) + '</small></th>';
+            });
+            hHtml += '<th>Days</th></tr>';
+            header.innerHTML = hHtml;
+
+            var bHtml = '';
+            workers.forEach(function(w) {
+                bHtml += '<tr><td><strong>' + w.name + '</strong></td>';
+                var daysPresent = 0;
+                weekDates.forEach(function(date) {
+                    var record = attData.find(function(a) { return a.workerName === w.name && a.date === date; });
+                    var present = record ? record.present : false;
+                    if (present) daysPresent++;
+                    bHtml += '<td style="text-align:center;"><span class="badge ' + (present ? 'badge-present' : 'badge-absent') + '">' + (present ? '✓' : '✗') + '</span></td>';
+                });
+                bHtml += '<td><strong>' + daysPresent + '/7</strong></td></tr>';
+            });
+            body.innerHTML = bHtml || '<tr><td colspan="9" style="text-align:center;color:#999;">No workers</td></tr>';
+        }
+
+        function changeWeek(dir) {
+            currentWeekStart.setDate(currentWeekStart.getDate() + (dir * 7));
+            loadWeeklyAttendance();
+        }
+
+        function showToast(msg) {
+            var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+            setTimeout(function() { t.style.display = 'none'; }, 2500);
+        }
+    </script>
+</body>
+</html>

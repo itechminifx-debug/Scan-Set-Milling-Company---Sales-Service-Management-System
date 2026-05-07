@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bread Flour Tracking | Scan Set Milling</title>
+    <style>
+        :root {
+            --primary: #5d3a1a; --primary-light: #8b5e3c; --accent: #d4a574;
+            --bg: #fdf6f0; --card: #fff; --text: #3d2b1f; --text-light: #7a6a5c; --border: #e8d5c4;
+            --success: #2d6a4f; --warning: #c97a2a; --danger: #c0392b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: var(--bg); min-height: 100vh; padding-bottom: 40px; }
+
+        .navbar {
+            background: linear-gradient(135deg, #5d3a1a, #8b5e3c); color: white;
+            padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .navbar .brand { font-size: 18px; font-weight: 700; }
+        .navbar a { color: white; text-decoration: none; font-size: 13px; background: rgba(255,255,255,0.15); padding: 7px 14px; border-radius: 6px; }
+
+        .container { max-width: 950px; margin: 0 auto; padding: 20px; }
+
+        .card {
+            background: var(--card); border-radius: 16px; padding: 22px;
+            margin-bottom: 18px; box-shadow: 0 3px 15px rgba(0,0,0,0.06);
+        }
+        .card h3 { color: var(--primary); font-size: 18px; margin-bottom: 16px; }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-weight: 600; color: var(--text); margin-bottom: 5px; font-size: 12px; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 11px; border: 2px solid var(--border); border-radius: 8px;
+            font-size: 14px; background: #fdf9f5;
+        }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+        table th { background: var(--primary); color: white; padding: 10px 8px; text-align: left; font-size: 10px; text-transform: uppercase; }
+        table td { padding: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+        table tr:hover td { background: #fdf6f0; }
+
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+        .badge-active { background: #d4edda; color: #155724; }
+        .badge-used { background: #e2e8f0; color: #4a5568; }
+
+        .btn {
+            padding: 10px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+            cursor: pointer; color: white; transition: all 0.2s; white-space: nowrap;
+        }
+        .btn-primary { background: var(--primary); }
+        .btn-success { background: var(--success); }
+        .btn-warning { background: var(--warning); }
+        .btn-danger { background: var(--danger); padding: 6px 10px; font-size: 11px; }
+        .btn-sm { padding: 6px 10px; font-size: 11px; }
+
+        .toast {
+            position: fixed; bottom: 20px; left: 20px; right: 20px;
+            background: var(--success); color: white; padding: 15px; border-radius: 12px;
+            text-align: center; z-index: 1000; display: none; animation: slideUp 0.3s;
+        }
+        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        @media (max-width: 650px) {
+            .form-row { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="brand">🍞 Bread Flour Tracking</div>
+        <a href="dashboard.html">🔙 Dashboard</a>
+    </div>
+
+    <div class="container">
+
+        <!-- Register Customer -->
+        <div class="card">
+            <h3>➕ Register Bread Maker</h3>
+            <div class="form-row">
+                <div class="form-group"><label>Customer Name</label><input type="text" id="customerName" placeholder="e.g., Ama Serwaa"></div>
+                <div class="form-group"><label>Phone Number</label><input type="text" id="customerPhone" placeholder="e.g., 0244-123-456"></div>
+                <button class="btn btn-success" onclick="registerCustomer()" style="height:42px;">➕ Register</button>
+            </div>
+        </div>
+
+        <!-- Deposit Bags -->
+        <div class="card">
+            <h3>📥 Deposit Flour Bags</h3>
+            <div class="form-row">
+                <div class="form-group"><label>Customer</label><select id="depositCustomer"></select></div>
+                <div class="form-group"><label>Bag Size (kg)</label><input type="number" id="bagSize" placeholder="e.g., 20" min="1" value="20"></div>
+                <div class="form-group"><label>Number of Bags</label><input type="number" id="bagQuantity" placeholder="e.g., 3" min="1" value="1"></div>
+                <button class="btn btn-primary" onclick="depositBags()" style="height:42px;">📥 Deposit</button>
+            </div>
+        </div>
+
+        <!-- Deduct from Bag -->
+        <div class="card">
+            <h3>➖ Deduct from Bag (When Used)</h3>
+            <div class="form-row">
+                <div class="form-group"><label>Customer</label><select id="deductCustomer" onchange="loadDeductBags()"></select></div>
+                <div class="form-group"><label>Select Bag</label><select id="deductBag"></select></div>
+                <div class="form-group"><label>Amount Used (kg)</label><input type="number" id="deductAmount" placeholder="e.g., 5" min="1" value="1"></div>
+                <button class="btn btn-warning" onclick="deductFromBag()" style="height:42px;">➖ Deduct</button>
+            </div>
+        </div>
+
+        <!-- Customer Bag Overview -->
+        <div class="card">
+            <h3>📊 Customer Bag Overview</h3>
+            <div class="form-group">
+                <label>Select Customer to View</label>
+                <select id="viewCustomer" onchange="loadCustomerBags()">
+                    <option value="">-- Select Customer --</option>
+                </select>
+            </div>
+            <div id="customerBagDetails" style="margin-top:10px;">
+                <p style="color:#999;text-align:center;">Select a customer to view their bags</p>
+            </div>
+        </div>
+
+        <!-- All Active Bags -->
+        <div class="card">
+            <h3>📋 All Active Flour Bags</h3>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead><tr><th>Bag ID</th><th>Customer</th><th>Size</th><th>Deposited</th><th>Used</th><th>Remaining</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody id="allBagsTable"><tr><td colspan="8" style="text-align:center;">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ==================== DATA HELPERS ====================
+        function getCustomers() {
+            var saved = localStorage.getItem('milling_bread_customers');
+            return saved ? JSON.parse(saved) : [];
+        }
+        function saveCustomers(customers) {
+            localStorage.setItem('milling_bread_customers', JSON.stringify(customers));
+        }
+        function getBags() {
+            var saved = localStorage.getItem('milling_bread_bags');
+            return saved ? JSON.parse(saved) : [];
+        }
+        function saveBags(bags) {
+            localStorage.setItem('milling_bread_bags', JSON.stringify(bags));
+        }
+
+        // ==================== INIT ====================
+        window.onload = function() {
+            populateCustomerDropdowns();
+            loadAllBagsTable();
+        };
+
+        function populateCustomerDropdowns() {
+            var customers = getCustomers();
+            var dropdowns = ['depositCustomer', 'deductCustomer', 'viewCustomer'];
+            dropdowns.forEach(function(id) {
+                var sel = document.getElementById(id);
+                sel.innerHTML = '<option value="">-- Select Customer --</option>';
+                customers.forEach(function(c) {
+                    sel.innerHTML += '<option value="' + c.id + '">' + c.name + ' (' + c.phone + ')</option>';
+                });
+            });
+        }
+
+        // ==================== REGISTER CUSTOMER ====================
+        function registerCustomer() {
+            var name = document.getElementById('customerName').value.trim();
+            var phone = document.getElementById('customerPhone').value.trim();
+            if (!name) { showToast('Enter customer name!', 'error'); return; }
+            var customers = getCustomers();
+            var id = 'BC' + String(customers.length + 1).padStart(3, '0');
+            customers.push({ id: id, name: name, phone: phone, registered: new Date().toLocaleDateString() });
+            saveCustomers(customers);
+            document.getElementById('customerName').value = '';
+            document.getElementById('customerPhone').value = '';
+            populateCustomerDropdowns();
+            showToast('Customer registered! ✅');
+        }
+
+        // ==================== DEPOSIT BAGS ====================
+        function depositBags() {
+            var customerId = document.getElementById('depositCustomer').value;
+            var size = parseInt(document.getElementById('bagSize').value) || 20;
+            var quantity = parseInt(document.getElementById('bagQuantity').value) || 1;
+            if (!customerId) { showToast('Select a customer!', 'error'); return; }
+
+            var customers = getCustomers();
+            var customer = customers.find(function(c) { return c.id === customerId; });
+            var bags = getBags();
+
+            for (var i = 0; i < quantity; i++) {
+                var bagId = 'BAG' + String(bags.length + 1).padStart(4, '0');
+                bags.push({
+                    id: bagId,
+                    customerId: customerId,
+                    customerName: customer ? customer.name : '',
+                    size: size,
+                    deposited: new Date().toLocaleDateString(),
+                    used: 0,
+                    remaining: size,
+                    status: 'Active'
+                });
+            }
+
+            saveBags(bags);
+            loadAllBagsTable();
+            loadDeductBags();
+            showToast(quantity + ' bag(s) of ' + size + 'kg deposited! ✅');
+        }
+
+        // ==================== DEDUCT FROM BAG ====================
+        function loadDeductBags() {
+            var customerId = document.getElementById('deductCustomer').value;
+            var sel = document.getElementById('deductBag');
+            sel.innerHTML = '<option value="">-- Select Bag --</option>';
+            if (!customerId) return;
+
+            var bags = getBags().filter(function(b) { return b.customerId === customerId && b.status === 'Active'; });
+            bags.forEach(function(b) {
+                sel.innerHTML += '<option value="' + b.id + '">' + b.id + ' - ' + b.size + 'kg (Remaining: ' + b.remaining + 'kg)</option>';
+            });
+        }
+
+        function deductFromBag() {
+            var bagId = document.getElementById('deductBag').value;
+            var amount = parseInt(document.getElementById('deductAmount').value) || 0;
+            if (!bagId) { showToast('Select a bag!', 'error'); return; }
+            if (amount < 1) { showToast('Enter amount to deduct!', 'error'); return; }
+
+            var bags = getBags();
+            var bag = bags.find(function(b) { return b.id === bagId; });
+            if (!bag) return;
+            if (amount > bag.remaining) { showToast('Amount exceeds remaining! Remaining: ' + bag.remaining + 'kg', 'error'); return; }
+
+            bag.used += amount;
+            bag.remaining -= amount;
+            if (bag.remaining <= 0) { bag.status = 'Used'; bag.remaining = 0; }
+
+            saveBags(bags);
+            loadAllBagsTable();
+            loadDeductBags();
+            loadCustomerBags();
+            document.getElementById('deductAmount').value = '1';
+            showToast('Deducted ' + amount + 'kg from ' + bagId + ' ✅');
+        }
+
+        // ==================== VIEW CUSTOMER BAGS ====================
+        function loadCustomerBags() {
+            var customerId = document.getElementById('viewCustomer').value;
+            var div = document.getElementById('customerBagDetails');
+            if (!customerId) { div.innerHTML = '<p style="color:#999;text-align:center;">Select a customer to view their bags</p>'; return; }
+
+            var customers = getCustomers();
+            var customer = customers.find(function(c) { return c.id === customerId; });
+            var bags = getBags().filter(function(b) { return b.customerId === customerId; });
+            var activeBags = bags.filter(function(b) { return b.status === 'Active'; });
+            var usedBags = bags.filter(function(b) { return b.status === 'Used'; });
+
+            var html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:15px;">';
+            html += '<div style="background:#f0fdf4;padding:12px;border-radius:8px;text-align:center;"><strong style="color:#2d6a4f;">' + bags.length + '</strong><br><small>Total Bags</small></div>';
+            html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center;"><strong style="color:#1e6091;">' + activeBags.length + '</strong><br><small>Active Bags</small></div>';
+            html += '<div style="background:#fefce8;padding:12px;border-radius:8px;text-align:center;"><strong style="color:#854d0e;">' + usedBags.length + '</strong><br><small>Used Bags</small></div>';
+            html += '</div>';
+
+            if (customer) {
+                html += '<p style="margin-bottom:8px;"><strong>Customer:</strong> ' + customer.name + ' | <strong>Phone:</strong> ' + (customer.phone || 'N/A') + '</p>';
+            }
+
+            html += '<table><thead><tr><th>Bag ID</th><th>Size</th><th>Deposited</th><th>Used</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
+            bags.forEach(function(b) {
+                html += '<tr><td>' + b.id + '</td><td>' + b.size + 'kg</td><td>' + b.deposited + '</td><td>' + b.used + 'kg</td><td><strong>' + b.remaining + 'kg</strong></td><td><span class="badge ' + (b.status === 'Active' ? 'badge-active' : 'badge-used') + '">' + b.status + '</span></td></tr>';
+            });
+            html += '</tbody></table>';
+
+            div.innerHTML = html;
+        }
+
+        // ==================== ALL BAGS TABLE ====================
+        function loadAllBagsTable() {
+            var bags = getBags().filter(function(b) { return b.status === 'Active'; });
+            var tbody = document.getElementById('allBagsTable');
+            var html = '';
+            bags.forEach(function(b) {
+                html += '<tr><td><strong>' + b.id + '</strong></td><td>' + b.customerName + '</td><td>' + b.size + 'kg</td><td>' + b.deposited + '</td><td>' + b.used + 'kg</td><td><strong>' + b.remaining + 'kg</strong></td><td><span class="badge badge-active">' + b.status + '</span></td><td><button class="btn btn-danger btn-sm" onclick="markBagUsed(\'' + b.id + '\')">✔️ Mark Used</button></td></tr>';
+            });
+            tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#999;">No active bags</td></tr>';
+        }
+
+        function markBagUsed(bagId) {
+            if (confirm('Mark this bag as fully used?')) {
+                var bags = getBags();
+                var bag = bags.find(function(b) { return b.id === bagId; });
+                if (bag) { bag.status = 'Used'; bag.remaining = 0; }
+                saveBags(bags);
+                loadAllBagsTable();
+                loadCustomerBags();
+                showToast('Bag marked as used.');
+            }
+        }
+
+        function showToast(msg, type) {
+            var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+            t.style.background = type === 'error' ? '#c0392b' : '#2d6a4f';
+            setTimeout(function() { t.style.display = 'none'; }, 2500);
+        }
+    </script>
+</body>
+</html>

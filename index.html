@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Set Milling Company</title>
+    <style>
+        :root {
+            --primary: #5d3a1a;
+            --primary-light: #8b5e3c;
+            --accent: #d4a574;
+            --bg: #fdf6f0;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body {
+            background: linear-gradient(135deg, #5d3a1a 0%, #8b5e3c 50%, #5d3a1a 100%);
+            min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px;
+        }
+        .login-container {
+            background: white; border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+            width: 100%; max-width: 430px; overflow: hidden;
+        }
+        .login-header {
+            background: linear-gradient(135deg, #5d3a1a, #8b5e3c); color: white;
+            padding: 35px 30px; text-align: center;
+        }
+        .login-header .logo {
+            width: 80px; height: 80px; background: white; border-radius: 50%;
+            margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;
+            font-size: 40px; color: #5d3a1a;
+        }
+        .login-header h1 { font-size: 20px; margin-bottom: 4px; }
+        .login-header p { font-size: 12px; opacity: 0.9; }
+        .login-body { padding: 30px; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-weight: 600; color: #333; margin-bottom: 6px; font-size: 13px; }
+        .form-group select, .form-group input {
+            width: 100%; padding: 14px; border: 2px solid #e0d5cc; border-radius: 10px;
+            font-size: 15px; background: #fdf9f5; transition: all 0.3s;
+        }
+        .form-group select:focus, .form-group input:focus { outline: none; border-color: #8b5e3c; background: white; }
+        .btn-login {
+            width: 100%; padding: 15px; background: linear-gradient(135deg, #5d3a1a, #8b5e3c);
+            color: white; border: none; border-radius: 10px; font-size: 17px; font-weight: 600;
+            cursor: pointer; margin-top: 8px; transition: all 0.3s;
+        }
+        .btn-login:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(93,58,26,0.3); }
+        .login-footer { text-align: center; padding: 18px; background: #fdf6f0; font-size: 11px; color: #999; }
+        .login-footer a { color: #8b5e3c; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="logo">🏭</div>
+            <h1>SCANSETH MILLING COMPANY</h1>
+            <p>Sales & Service Management System</p>
+        </div>
+        <div class="login-body">
+            <div class="form-group">
+                <label>👤 Select User</label>
+                <select id="userSelect">
+                    <option value="">-- Select Your Name --</option>
+                    <option value="admin">Administrator</option>
+                    <option value="Mr. Mensah">Mr. Mensah (Staff)</option>
+                    <option value="Owner">Owner (Remote View)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>🔑 Password</label>
+                <input type="password" id="passwordInput" placeholder="Enter password" value="1234">
+            </div>
+            <button class="btn-login" onclick="login()">🚀 Enter System</button>
+        </div>
+        <div class="login-footer">
+            © 2025 Scan Set Milling Company | <a href="admin.html">⚙️ Admin Panel</a>
+        </div>
+    </div>
+
+    <script>
+        function login() {
+            var user = document.getElementById('userSelect').value;
+            var pass = document.getElementById('passwordInput').value;
+            if (!user) { alert('Please select your name!'); return; }
+            if (pass !== '1234') { alert('Invalid password!'); return; }
+            localStorage.setItem('currentUser', user);
+            if (user === 'Owner') {
+                window.location.href = 'owner_view.html';
+            } else {
+                window.location.href = 'dashboard.html';
+            }
+        }
+    </script>
+</body>
+</html>

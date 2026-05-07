@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchases | Scan Set Milling</title>
+    <style>
+        :root {
+            --primary: #5d3a1a; --primary-light: #8b5e3c; --accent: #d4a574;
+            --bg: #fdf6f0; --card: #fff; --text: #3d2b1f; --text-light: #7a6a5c; --border: #e8d5c4;
+            --success: #2d6a4f; --warning: #c97a2a; --purple: #6c3483;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: var(--bg); min-height: 100vh; padding-bottom: 40px; }
+
+        .navbar {
+            background: linear-gradient(135deg, #5d3a1a, #8b5e3c); color: white;
+            padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .navbar .brand { font-size: 18px; font-weight: 700; }
+        .navbar a { color: white; text-decoration: none; font-size: 13px; background: rgba(255,255,255,0.15); padding: 7px 14px; border-radius: 6px; }
+
+        .container { max-width: 750px; margin: 0 auto; padding: 20px; }
+
+        .card {
+            background: var(--card); border-radius: 16px; padding: 22px;
+            margin-bottom: 18px; box-shadow: 0 3px 15px rgba(0,0,0,0.06);
+        }
+        .card h3 { color: var(--primary); font-size: 18px; margin-bottom: 16px; }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-weight: 600; color: var(--text); margin-bottom: 5px; font-size: 12px; }
+        .form-group input { width: 100%; padding: 11px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; background: #fdf9f5; }
+        .form-group input:focus { outline: none; border-color: var(--purple); }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+        table th { background: var(--purple); color: white; padding: 10px 8px; text-align: left; font-size: 10px; text-transform: uppercase; }
+        table td { padding: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+
+        .summary-card {
+            background: linear-gradient(135deg, #6c3483, #8e44ad); color: white;
+            padding: 16px 20px; border-radius: 12px; text-align: center; margin-bottom: 15px;
+        }
+        .summary-card .amount { font-size: 28px; font-weight: 700; }
+        .summary-card .label { font-size: 11px; opacity: 0.85; text-transform: uppercase; }
+
+        .btn {
+            padding: 10px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+            cursor: pointer; color: white; transition: all 0.2s; white-space: nowrap;
+        }
+        .btn-primary { background: var(--purple); }
+        .btn-success { background: var(--success); }
+        .btn-danger { background: #c0392b; padding: 5px 8px; font-size: 10px; }
+
+        .toast {
+            position: fixed; bottom: 20px; left: 20px; right: 20px;
+            background: var(--success); color: white; padding: 15px; border-radius: 12px;
+            text-align: center; z-index: 1000; display: none; animation: slideUp 0.3s;
+        }
+        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        @media (max-width: 600px) { .form-row { grid-template-columns: 1fr 1fr; } }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="brand">📦 Record Purchase</div>
+        <a href="dashboard.html">🔙 Dashboard</a>
+    </div>
+
+    <div class="container">
+
+        <div class="card">
+            <h3>➕ Add New Purchase</h3>
+            <div class="form-row">
+                <div class="form-group"><label>Item Name</label><input type="text" id="purchaseItem" placeholder="e.g., Grinding plate"></div>
+                <div class="form-group"><label>Purpose</label><input type="text" id="purchasePurpose" placeholder="e.g., Corn Mill repair"></div>
+                <div class="form-group"><label>Amount (GHS)</label><input type="number" id="purchaseAmount" placeholder="0.00" step="0.01"></div>
+                <button class="btn btn-primary" onclick="addPurchase()" style="height:42px;">📦 Add</button>
+            </div>
+        </div>
+
+        <div class="summary-card">
+            <div class="label">Total Purchases This Month</div>
+            <div class="amount" id="purchaseMonthTotal">GHS 0.00</div>
+        </div>
+
+        <div class="card">
+            <h3>📋 Purchase History</h3>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead><tr><th>Date</th><th>Item</th><th>Purpose</th><th>Amount</th><th>Action</th></tr></thead>
+                    <tbody id="purchasesTable"><tr><td colspan="5" style="text-align:center;">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        function getPurchases() {
+            var saved = localStorage.getItem('milling_purchases');
+            return saved ? JSON.parse(saved) : [];
+        }
+        function savePurchases(data) { localStorage.setItem('milling_purchases', JSON.stringify(data)); }
+
+        window.onload = function() { loadPurchases(); };
+
+        function addPurchase() {
+            var item = document.getElementById('purchaseItem').value.trim();
+            var purpose = document.getElementById('purchasePurpose').value.trim();
+            var amt = parseFloat(document.getElementById('purchaseAmount').value) || 0;
+            if (!item || !amt) { showToast('Fill all fields!', 'error'); return; }
+            var purchases = getPurchases();
+            purchases.push({ date: new Date().toLocaleDateString(), item: item, purpose: purpose, amount: amt });
+            savePurchases(purchases);
+            document.getElementById('purchaseItem').value = '';
+            document.getElementById('purchasePurpose').value = '';
+            document.getElementById('purchaseAmount').value = '';
+            loadPurchases();
+            showToast('Purchase recorded! 📦');
+        }
+
+        function deletePurchase(index) {
+            if (confirm('Delete this purchase?')) {
+                var purchases = getPurchases();
+                purchases.splice(index, 1);
+                savePurchases(purchases);
+                loadPurchases();
+                showToast('Purchase deleted.');
+            }
+        }
+
+        function loadPurchases() {
+            var purchases = getPurchases();
+            purchases.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+
+            var now = new Date();
+            var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString();
+            var monthTotal = purchases.filter(function(p) { return new Date(p.date) >= new Date(monthStart); }).reduce(function(s, p) { return s + p.amount; }, 0);
+            document.getElementById('purchaseMonthTotal').textContent = 'GHS ' + monthTotal.toFixed(2);
+
+            var tbody = document.getElementById('purchasesTable');
+            var html = '';
+            purchases.slice(0, 20).forEach(function(p, i) {
+                html += '<tr><td>' + p.date + '</td><td>' + p.item + '</td><td>' + p.purpose + '</td><td><strong>GHS ' + p.amount.toFixed(2) + '</strong></td><td><button class="btn btn-danger" onclick="deletePurchase(' + i + ')">🗑</button></td></tr>';
+            });
+            tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#999;">No purchases recorded</td></tr>';
+        }
+
+        function showToast(msg, type) {
+            var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+            t.style.background = type === 'error' ? '#c0392b' : '#2d6a4f';
+            setTimeout(function() { t.style.display = 'none'; }, 2500);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner View | Scan Set Milling</title>
+    <style>
+        :root {
+            --primary: #1a1a2e; --accent: #e94560; --bg: #f5f5f5; --card: #fff;
+            --text: #1a1a2e; --text-light: #666; --border: #e0e0e0;
+            --success: #2d6a4f; --danger: #c0392b; --info: #1e6091; --warning: #c97a2a;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: var(--bg); min-height: 100vh; padding-bottom: 40px; }
+
+        .navbar {
+            background: var(--primary); color: white; padding: 16px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .navbar .brand { font-size: 20px; font-weight: 700; }
+        .navbar .brand span { color: var(--accent); }
+        .navbar a { color: white; text-decoration: none; font-size: 13px; }
+
+        .container { max-width: 1000px; margin: 0 auto; padding: 25px 20px; }
+
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-card {
+            background: var(--card); border-radius: 16px; padding: 20px; text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06); position: relative; overflow: hidden;
+        }
+        .stat-card .icon { position: absolute; right: 10px; top: 10px; font-size: 32px; opacity: 0.1; }
+        .stat-card .value { font-size: 28px; font-weight: 700; color: var(--primary); position: relative; }
+        .stat-card .label { font-size: 11px; color: var(--text-light); text-transform: uppercase; margin-top: 4px; }
+        .stat-card.revenue { border-top: 4px solid var(--success); }
+        .stat-card.expenses { border-top: 4px solid var(--danger); }
+        .stat-card.profit { border-top: 4px solid var(--info); }
+        .stat-card.pending { border-top: 4px solid var(--warning); }
+
+        .card {
+            background: var(--card); border-radius: 16px; padding: 22px;
+            margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+        }
+        .card h3 { color: var(--primary); font-size: 17px; margin-bottom: 16px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        table th { background: var(--primary); color: white; padding: 10px 8px; text-align: left; font-size: 10px; text-transform: uppercase; }
+        table td { padding: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .alert-box {
+            padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 8px;
+        }
+        .alert-warning { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
+        .alert-success { background: #d4edda; color: #155724; border-left: 4px solid #2d6a4f; }
+
+        @media (max-width: 700px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .stats-row { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="brand">👑 Owner <span>View</span></div>
+        <a href="index.html">🚪 Logout</a>
+    </div>
+
+    <div class="container">
+
+        <div class="stats-row">
+            <div class="stat-card revenue"><div class="icon">💰</div><div class="value" id="monthRevenue">GHS 0</div><div class="label">Revenue This Month</div></div>
+            <div class="stat-card expenses"><div class="icon">💸</div><div class="value" id="monthExpenses">GHS 0</div><div class="label">Expenses This Month</div></div>
+            <div class="stat-card profit"><div class="icon">📈</div><div class="value" id="monthProfit">GHS 0</div><div class="label">Net Profit This Month</div></div>
+            <div class="stat-card pending"><div class="icon">⏳</div><div class="value" id="pendingAmount">GHS 0</div><div class="label">Pending Payments</div></div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <h3>📊 Profit Breakdown</h3>
+                <table>
+                    <tr><td>Revenue</td><td style="text-align:right;" id="breakRevenue">GHS 0</td></tr>
+                    <tr><td style="color:var(--danger);">(-) Expenses</td><td style="text-align:right;color:var(--danger);" id="breakExpenses">GHS 0</td></tr>
+                    <tr><td style="color:var(--danger);">(-) Purchases</td><td style="text-align:right;color:var(--danger);" id="breakPurchases">GHS 0</td></tr>
+                    <tr><td style="color:var(--danger);">(-) Worker Pay</td><td style="text-align:right;color:var(--danger);" id="breakWorkerPay">GHS 0</td></tr>
+                    <tr style="font-weight:700;font-size:15px;background:#f0fdf4;"><td>NET PROFIT</td><td style="text-align:right;color:var(--success);" id="breakProfit">GHS 0</td></tr>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3>⚠️ Alerts & Notifications</h3>
+                <div id="alertsContainer">
+                    <p style="color:#999;">Loading alerts...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>🏭 Machine Performance (This Month)</h3>
+            <table><thead><tr><th>Machine</th><th>Transactions</th><th>Revenue</th></tr></thead>
+                <tbody id="machinePerf"><tr><td colspan="3" style="text-align:center;">Loading...</td></tr></tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h3>📋 Recent Transactions</h3>
+            <table><thead><tr><th>Date</th><th>Machine</th><th>Qty</th><th>Total</th><th>Status</th></tr></thead>
+                <tbody id="recentTxns"><tr><td colspan="5" style="text-align:center;">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function getTxns() { var s = localStorage.getItem('milling_transactions'); return s ? JSON.parse(s) : []; }
+        function getExp() { var s = localStorage.getItem('milling_expenses'); return s ? JSON.parse(s) : []; }
+        function getPur() { var s = localStorage.getItem('milling_purchases'); return s ? JSON.parse(s) : []; }
+        function getPay() { var s = localStorage.getItem('milling_worker_payments'); return s ? JSON.parse(s) : []; }
+
+        var monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString();
+
+        window.onload = function() { loadOwnerView(); };
+
+        function loadOwnerView() {
+            var txns = getTxns();
+            var monthTxns = txns.filter(function(t) { return new Date(t.date) >= new Date(monthStart); });
+            var revenue = monthTxns.reduce(function(s, t) { return s + t.total; }, 0);
+            var expenses = getExp().filter(function(e) { return new Date(e.date) >= new Date(monthStart); }).reduce(function(s, e) { return s + e.amount; }, 0);
+            var purchases = getPur().filter(function(p) { return new Date(p.date) >= new Date(monthStart); }).reduce(function(s, p) { return s + p.amount; }, 0);
+            var workerPay = getPay().filter(function(p) { return new Date(p.paidDate) >= new Date(monthStart); }).reduce(function(s, p) { return s + p.amount; }, 0);
+            var profit = revenue - expenses - purchases - workerPay;
+            var pending = txns.filter(function(t) { return t.status === 'Pending'; }).reduce(function(s, t) { return s + t.total; }, 0);
+
+            document.getElementById('monthRevenue').textContent = 'GHS ' + revenue.toFixed(2);
+            document.getElementById('monthExpenses').textContent = 'GHS ' + expenses.toFixed(2);
+            document.getElementById('monthProfit').textContent = 'GHS ' + profit.toFixed(2);
+            document.getElementById('pendingAmount').textContent = 'GHS ' + pending.toFixed(2);
+
+            document.getElementById('breakRevenue').textContent = 'GHS ' + revenue.toFixed(2);
+            document.getElementById('breakExpenses').textContent = '- GHS ' + expenses.toFixed(2);
+            document.getElementById('breakPurchases').textContent = '- GHS ' + purchases.toFixed(2);
+            document.getElementById('breakWorkerPay').textContent = '- GHS ' + workerPay.toFixed(2);
+            document.getElementById('breakProfit').textContent = 'GHS ' + profit.toFixed(2);
+
+            // Alerts
+            var alerts = '';
+            if (pending > 0) alerts += '<div class="alert-box alert-warning">⚠️ There are pending payments totaling <strong>GHS ' + pending.toFixed(2) + '</strong></div>';
+            if (profit < 0) alerts += '<div class="alert-box alert-warning">⚠️ Net profit is negative this month. Review expenses.</div>';
+            if (revenue > 0) alerts += '<div class="alert-box alert-success">✅ Revenue this month: <strong>GHS ' + revenue.toFixed(2) + '</strong></div>';
+            if (!alerts) alerts = '<div class="alert-box alert-success">✅ All systems normal. No alerts.</div>';
+            document.getElementById('alertsContainer').innerHTML = alerts;
+
+            // Machine performance
+            var machines = {};
+            monthTxns.forEach(function(t) {
+                if (!machines[t.machine]) machines[t.machine] = { count: 0, revenue: 0 };
+                machines[t.machine].count++; machines[t.machine].revenue += t.total;
+            });
+            var mhtml = '';
+            Object.keys(machines).sort().forEach(function(m) {
+                mhtml += '<tr><td><strong>' + m + '</strong></td><td>' + machines[m].count + '</td><td>GHS ' + machines[m].revenue.toFixed(2) + '</td></tr>';
+            });
+            document.getElementById('machinePerf').innerHTML = mhtml || '<tr><td colspan="3" style="text-align:center;color:#999;">No data</td></tr>';
+
+            // Recent transactions
+            var recent = txns.slice(-8).reverse();
+            var rhtml = '';
+            recent.forEach(function(t) {
+                rhtml += '<tr><td>' + t.date + '</td><td>' + t.machine + '</td><td>' + t.quantity + '</td><td>GHS ' + t.total.toFixed(2) + '</td><td>' + t.status + '</td></tr>';
+            });
+            document.getElementById('recentTxns').innerHTML = rhtml || '<tr><td colspan="5" style="text-align:center;color:#999;">No transactions</td></tr>';
+        }
+    </script>
+</body>
+</html>

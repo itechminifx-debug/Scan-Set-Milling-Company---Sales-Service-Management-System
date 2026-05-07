@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports | Scan Set Milling</title>
+    <style>
+        :root {
+            --primary: #5d3a1a; --primary-light: #8b5e3c; --accent: #d4a574;
+            --bg: #fdf6f0; --card: #fff; --text: #3d2b1f; --text-light: #7a6a5c; --border: #e8d5c4;
+            --success: #2d6a4f; --danger: #c0392b; --info: #1e6091; --warning: #c97a2a;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: var(--bg); min-height: 100vh; padding-bottom: 40px; }
+
+        .navbar {
+            background: linear-gradient(135deg, #5d3a1a, #8b5e3c); color: white;
+            padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .navbar .brand { font-size: 18px; font-weight: 700; }
+        .navbar a { color: white; text-decoration: none; font-size: 13px; background: rgba(255,255,255,0.15); padding: 7px 14px; border-radius: 6px; }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+
+        .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: white; border-radius: 12px; padding: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .tab {
+            flex: 1; padding: 12px; border: none; background: transparent; border-radius: 10px;
+            font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-light); transition: all 0.2s;
+        }
+        .tab.active { background: var(--primary); color: white; }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-card {
+            background: var(--card); border-radius: 14px; padding: 16px; text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.04); border-left: 4px solid var(--primary);
+        }
+        .stat-card .value { font-size: 24px; font-weight: 700; color: var(--primary); }
+        .stat-card .label { font-size: 10px; color: var(--text-light); text-transform: uppercase; margin-top: 2px; }
+
+        .card {
+            background: var(--card); border-radius: 16px; padding: 20px;
+            margin-bottom: 18px; box-shadow: 0 3px 15px rgba(0,0,0,0.06);
+        }
+        .card h3 { color: var(--primary); font-size: 16px; margin-bottom: 14px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+        table th { background: var(--primary); color: white; padding: 10px 8px; text-align: left; font-size: 10px; text-transform: uppercase; }
+        table td { padding: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+
+        .btn {
+            padding: 10px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+            cursor: pointer; color: white; transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); }
+        .btn-success { background: var(--success); }
+
+        @media (max-width: 600px) {
+            .tabs { flex-wrap: wrap; }
+            .tab { font-size: 11px; padding: 10px; }
+            .stats-row { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="brand">📊 Reports</div>
+        <a href="dashboard.html">🔙 Dashboard</a>
+    </div>
+
+    <div class="container">
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('daily')">📅 Today</button>
+            <button class="tab" onclick="switchTab('monthly')">📆 This Month</button>
+            <button class="tab" onclick="switchTab('machines')">🏭 By Machine</button>
+            <button class="tab" onclick="switchTab('summary')">📋 Summary</button>
+        </div>
+
+        <!-- ==================== DAILY REPORT ==================== -->
+        <div id="panel-daily" class="panel active">
+            <div class="stats-row">
+                <div class="stat-card"><div class="value" id="dRevenue">GHS 0</div><div class="label">Revenue</div></div>
+                <div class="stat-card" style="border-left-color:var(--success);"><div class="value" id="dTransactions">0</div><div class="label">Transactions</div></div>
+                <div class="stat-card" style="border-left-color:var(--danger);"><div class="value" id="dExpenses">GHS 0</div><div class="label">Expenses</div></div>
+                <div class="stat-card" style="border-left-color:var(--info);"><div class="value" id="dBalance">GHS 0</div><div class="label">Balance</div></div>
+            </div>
+
+            <div class="card">
+                <h3>📋 Today's Transactions</h3>
+                <table><thead><tr><th>Time</th><th>Machine</th><th>Qty</th><th>Total</th><th>Status</th></tr></thead>
+                    <tbody id="dailyTransactions"><tr><td colspan="5" style="text-align:center;">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ==================== MONTHLY REPORT ==================== -->
+        <div id="panel-monthly" class="panel">
+            <div class="stats-row">
+                <div class="stat-card"><div class="value" id="mRevenue">GHS 0</div><div class="label">Revenue</div></div>
+                <div class="stat-card" style="border-left-color:var(--danger);"><div class="value" id="mExpenses">GHS 0</div><div class="label">Expenses</div></div>
+                <div class="stat-card" style="border-left-color:var(--warning);"><div class="value" id="mPurchases">GHS 0</div><div class="label">Purchases</div></div>
+                <div class="stat-card" style="border-left-color:var(--info);"><div class="value" id="mWorkerPay">GHS 0</div><div class="label">Worker Pay</div></div>
+                <div class="stat-card" style="border-left-color:var(--success);"><div class="value" id="mProfit">GHS 0</div><div class="label">Net Profit</div></div>
+            </div>
+
+            <div class="card">
+                <h3>📋 Profit Calculation</h3>
+                <table>
+                    <tr><td><strong>Revenue</strong></td><td style="text-align:right;" id="calcRevenue">GHS 0</td></tr>
+                    <tr><td style="color:#c0392b;"><strong>(-) Expenses</strong></td><td style="text-align:right;color:#c0392b;" id="calcExpenses">GHS 0</td></tr>
+                    <tr><td style="color:#c0392b;"><strong>(-) Purchases</strong></td><td style="text-align:right;color:#c0392b;" id="calcPurchases">GHS 0</td></tr>
+                    <tr><td style="color:#c0392b;"><strong>(-) Worker Payments</strong></td><td style="text-align:right;color:#c0392b;" id="calcWorkerPay">GHS 0</td></tr>
+                    <tr style="font-size:16px;font-weight:700;background:#f0fdf4;"><td><strong>NET PROFIT</strong></td><td style="text-align:right;color:#2d6a4f;" id="calcProfit">GHS 0</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- ==================== BY MACHINE ==================== -->
+        <div id="panel-machines" class="panel">
+            <div class="card">
+                <h3>🏭 Revenue by Machine (This Month)</h3>
+                <table><thead><tr><th>Machine</th><th>Transactions</th><th>Revenue</th></tr></thead>
+                    <tbody id="machineRevenue"><tr><td colspan="3" style="text-align:center;">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ==================== SUMMARY ==================== -->
+        <div id="panel-summary" class="panel">
+            <div class="card">
+                <h3>📋 Overall Summary</h3>
+                <table>
+                    <tr><td><strong>Total Transactions (All Time)</strong></td><td style="text-align:right;" id="sTransactions">0</td></tr>
+                    <tr><td><strong>Total Revenue (All Time)</strong></td><td style="text-align:right;" id="sRevenue">GHS 0</td></tr>
+                    <tr><td><strong>Pending Payments</strong></td><td style="text-align:right;color:#c97a2a;" id="sPending">GHS 0</td></tr>
+                    <tr><td><strong>Active Bread Bags</strong></td><td style="text-align:right;" id="sBags">0</td></tr>
+                    <tr><td><strong>Active Workers</strong></td><td style="text-align:right;" id="sWorkers">0</td></tr>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function getTxns() { var s = localStorage.getItem('milling_transactions'); return s ? JSON.parse(s) : []; }
+        function getExp() { var s = localStorage.getItem('milling_expenses'); return s ? JSON.parse(s) : []; }
+        function getPur() { var s = localStorage.getItem('milling_purchases'); return s ? JSON.parse(s) : []; }
+        function getPay() { var s = localStorage.getItem('milling_worker_payments'); return s ? JSON.parse(s) : []; }
+        function getBags() { var s = localStorage.getItem('milling_bread_bags'); return s ? JSON.parse(s) : []; }
+        function getWorkers() { var s = localStorage.getItem('milling_workers'); return s ? JSON.parse(s) : []; }
+
+        var today = new Date().toLocaleDateString();
+        var monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString();
+
+        window.onload = function() {
+            loadDailyReport();
+            loadMonthlyReport();
+            loadMachineReport();
+            loadSummaryReport();
+        };
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+            event.target.classList.add('active');
+            document.getElementById('panel-' + name).classList.add('active');
+        }
+
+        function loadDailyReport() {
+            var txns = getTxns().filter(function(t) { return t.date === today; });
+            var rev = txns.reduce(function(s, t) { return s + t.total; }, 0);
+            var exp = getExp().filter(function(e) { return e.date === today; }).reduce(function(s, e) { return s + e.amount; }, 0);
+            document.getElementById('dRevenue').textContent = 'GHS ' + rev.toFixed(2);
+            document.getElementById('dTransactions').textContent = txns.length;
+            document.getElementById('dExpenses').textContent = 'GHS ' + exp.toFixed(2);
+            document.getElementById('dBalance').textContent = 'GHS ' + (rev - exp).toFixed(2);
+
+            var tbody = document.getElementById('dailyTransactions');
+            var html = '';
+            txns.slice(-10).reverse().forEach(function(t) {
+                html += '<tr><td>' + t.time + '</td><td>' + t.machine + '</td><td>' + t.quantity + '</td><td>GHS ' + t.total.toFixed(2) + '</td><td>' + t.status + '</td></tr>';
+            });
+            tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#999;">No transactions today</td></tr>';
+        }
+
+        function loadMonthlyReport() {
+            var txns = getTxns().filter(function(t) { return new Date(t.date) >= new Date(monthStart); });
+            var rev = txns.reduce(function(s, t) { return s + t.total; }, 0);
+            var exp = getExp().filter(function(e) { return new Date(e.date) >= new Date(monthStart); }).reduce(function(s, e) { return s + e.amount; }, 0);
+            var pur = getPur().filter(function(p) { return new Date(p.date) >= new Date(monthStart); }).reduce(function(s, p) { return s + p.amount; }, 0);
+            var pay = getPay().filter(function(p) { return new Date(p.paidDate) >= new Date(monthStart); }).reduce(function(s, p) { return s + p.amount; }, 0);
+            var profit = rev - exp - pur - pay;
+
+            document.getElementById('mRevenue').textContent = 'GHS ' + rev.toFixed(2);
+            document.getElementById('mExpenses').textContent = 'GHS ' + exp.toFixed(2);
+            document.getElementById('mPurchases').textContent = 'GHS ' + pur.toFixed(2);
+            document.getElementById('mWorkerPay').textContent = 'GHS ' + pay.toFixed(2);
+            document.getElementById('mProfit').textContent = 'GHS ' + profit.toFixed(2);
+
+            document.getElementById('calcRevenue').textContent = 'GHS ' + rev.toFixed(2);
+            document.getElementById('calcExpenses').textContent = '- GHS ' + exp.toFixed(2);
+            document.getElementById('calcPurchases').textContent = '- GHS ' + pur.toFixed(2);
+            document.getElementById('calcWorkerPay').textContent = '- GHS ' + pay.toFixed(2);
+            document.getElementById('calcProfit').textContent = 'GHS ' + profit.toFixed(2);
+        }
+
+        function loadMachineReport() {
+            var txns = getTxns().filter(function(t) { return new Date(t.date) >= new Date(monthStart); });
+            var machines = {};
+            txns.forEach(function(t) {
+                if (!machines[t.machine]) machines[t.machine] = { count: 0, revenue: 0 };
+                machines[t.machine].count++;
+                machines[t.machine].revenue += t.total;
+            });
+
+            var tbody = document.getElementById('machineRevenue');
+            var html = '';
+            Object.keys(machines).sort().forEach(function(m) {
+                html += '<tr><td><strong>' + m + '</strong></td><td>' + machines[m].count + '</td><td>GHS ' + machines[m].revenue.toFixed(2) + '</td></tr>';
+            });
+            tbody.innerHTML = html || '<tr><td colspan="3" style="text-align:center;color:#999;">No data</td></tr>';
+        }
+
+        function loadSummaryReport() {
+            var txns = getTxns();
+            var rev = txns.reduce(function(s, t) { return s + t.total; }, 0);
+            var pending = txns.filter(function(t) { return t.status === 'Pending'; }).reduce(function(s, t) { return s + t.total; }, 0);
+            var bags = getBags().filter(function(b) { return b.status === 'Active'; });
+            var workers = getWorkers();
+
+            document.getElementById('sTransactions').textContent = txns.length;
+            document.getElementById('sRevenue').textContent = 'GHS ' + rev.toFixed(2);
+            document.getElementById('sPending').textContent = 'GHS ' + pending.toFixed(2);
+            document.getElementById('sBags').textContent = bags.length;
+            document.getElementById('sWorkers').textContent = workers.length;
+        }
+    </script>
+</body>
+</html>
