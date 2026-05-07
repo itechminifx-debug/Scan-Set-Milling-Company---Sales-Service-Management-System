@@ -78,18 +78,59 @@
     </div>
 
     <script>
-        function login() {
-            var user = document.getElementById('userSelect').value;
-            var pass = document.getElementById('passwordInput').value;
-            if (!user) { alert('Please select your name!'); return; }
-            if (pass !== '1234') { alert('Invalid password!'); return; }
-            localStorage.setItem('currentUser', user);
-            if (user === 'Owner') {
-                window.location.href = 'owner_view.html';
-            } else {
-                window.location.href = 'dashboard.html';
-            }
+      <script>
+    // Load users from admin panel
+    function loadUsers() {
+        var select = document.getElementById('userSelect');
+        var savedUsers = localStorage.getItem('milling_users');
+        var users = [];
+        
+        if (savedUsers) {
+            try { users = JSON.parse(savedUsers); } catch(e) { users = []; }
         }
+        
+        // If no users saved, use defaults
+        if (users.length === 0) {
+            users = [
+                { name: 'Administrator', password: '1234' },
+                { name: 'Mr. Mensah', password: '1234' },
+                { name: 'Owner', password: '1234' }
+            ];
+            localStorage.setItem('milling_users', JSON.stringify(users));
+        }
+        
+        // Clear and populate dropdown
+        select.innerHTML = '<option value="">-- Select Your Name --</option>';
+        users.forEach(function(u) {
+            select.innerHTML += '<option value="' + u.name + '">' + u.name + '</option>';
+        });
+    }
+
+    window.onload = function() { loadUsers(); };
+
+    function login() {
+        var user = document.getElementById('userSelect').value;
+        var pass = document.getElementById('passwordInput').value;
+        
+        if (!user) { alert('Please select your name!'); return; }
+        
+        // Find user and check password
+        var savedUsers = localStorage.getItem('milling_users');
+        var users = savedUsers ? JSON.parse(savedUsers) : [];
+        var foundUser = users.find(function(u) { return u.name === user; });
+        var validPassword = foundUser ? (foundUser.password || '1234') : '1234';
+        
+        if (pass !== validPassword) { alert('Invalid password!'); return; }
+        
+        localStorage.setItem('currentUser', user);
+        
+        if (user === 'Owner') {
+            window.location.href = 'owner_view.html';
+        } else {
+            window.location.href = 'dashboard.html';
+        }
+    }
+</script>
     </script>
 </body>
 </html>
