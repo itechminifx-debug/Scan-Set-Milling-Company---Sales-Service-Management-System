@@ -33,9 +33,25 @@
 
         .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
 
-        .date-banner {
-            background: var(--primary); color: white; padding: 14px 20px; border-radius: 14px;
-            text-align: center; margin-bottom: 20px; font-size: 17px; font-weight: 600;
+        /* Date Selector */
+        .date-selector {
+            background: var(--card); border-radius: 14px; padding: 16px 20px;
+            margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
+        }
+        .date-selector label { font-weight: 600; color: var(--text); font-size: 14px; }
+        .date-selector input[type="date"] {
+            padding: 10px 14px; border: 2px solid var(--border); border-radius: 8px;
+            font-size: 15px; background: #fdf9f5; color: var(--text);
+        }
+        .date-selector .btn-nav {
+            padding: 10px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600;
+            cursor: pointer; background: var(--primary); color: white; transition: all 0.2s;
+        }
+        .date-selector .btn-nav:hover { background: var(--primary-light); }
+        .date-selector .btn-today { background: #2d6a4f; }
+        .date-selector .selected-date {
+            font-size: 16px; font-weight: 700; color: var(--primary); min-width: 180px; text-align: center;
         }
 
         .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
@@ -79,6 +95,7 @@
         @media (max-width: 600px) {
             .stats-row { grid-template-columns: 1fr 1fr; }
             .quick-actions .btn { flex: 1; min-width: 120px; }
+            .date-selector { flex-direction: column; }
         }
     </style>
 </head>
@@ -97,28 +114,32 @@
     <!-- Main Content -->
     <div class="container">
 
-        <!-- Date Banner -->
-        <div class="date-banner">
-            📅 <span id="currentDate"></span>
+        <!-- Date Selector -->
+        <div class="date-selector">
+            <button class="btn-nav" onclick="changeDate(-1)">◀ Previous</button>
+            <input type="date" id="datePicker" onchange="onDatePicked()">
+            <button class="btn-nav btn-today" onclick="goToToday()">📅 Today</button>
+            <button class="btn-nav" onclick="changeDate(1)">Next ▶</button>
+            <div class="selected-date" id="selectedDateDisplay"></div>
         </div>
 
         <!-- Stats -->
         <div class="stats-row">
             <div class="stat-card">
-                <div class="value" id="todayRevenue">GHS 0</div>
-                <div class="label">Today's Revenue</div>
+                <div class="value" id="dayRevenue">GHS 0</div>
+                <div class="label">Revenue</div>
             </div>
             <div class="stat-card" style="border-left-color:#2d6a4f;">
-                <div class="value" id="todayTransactions">0</div>
-                <div class="label">Transactions Today</div>
+                <div class="value" id="dayTransactions">0</div>
+                <div class="label">Transactions</div>
             </div>
             <div class="stat-card" style="border-left-color:#c97a2a;">
-                <div class="value" id="workersPresent">0</div>
+                <div class="value" id="dayWorkers">0</div>
                 <div class="label">Workers Present</div>
             </div>
             <div class="stat-card" style="border-left-color:#c0392b;">
-                <div class="value" id="todayExpenses">GHS 0</div>
-                <div class="label">Expenses Today</div>
+                <div class="value" id="dayExpenses">GHS 0</div>
+                <div class="label">Expenses</div>
             </div>
         </div>
 
@@ -133,18 +154,18 @@
                 <a href="expenses.html" class="btn btn-red">💸 Expenses</a>
                 <a href="purchases.html" class="btn btn-purple">📦 Purchases</a>
                 <a href="reports.html" class="btn btn-teal">📊 Reports</a>
-                <button class="btn btn-danger" onclick="deleteTodayData()">🗑 Delete Today's Data</button>
+                <button class="btn btn-danger" onclick="deleteSelectedDateData()">🗑 Delete This Day's Data</button>
             </div>
         </div>
 
-        <!-- Recent Transactions -->
+        <!-- Transactions for Selected Date -->
         <div class="card">
-            <h3>📋 Today's Transactions</h3>
+            <h3>📋 Transactions for <span id="txnDateLabel">Today</span></h3>
             <div style="overflow-x:auto;">
                 <table>
                     <thead><tr><th>Time</th><th>Machine</th><th>Qty</th><th>Price</th><th>Total</th><th>Status</th></tr></thead>
-                    <tbody id="recentTransactions">
-                        <tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No transactions today</td></tr>
+                    <tbody id="dayTransactionsTable">
+                        <tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No transactions</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -152,76 +173,114 @@
     </div>
 
     <script>
-        var today = new Date().toLocaleDateString();
+        // The currently selected date (default: today)
+        var selectedDate = new Date().toLocaleDateString();
 
         window.onload = function() {
             var user = localStorage.getItem('currentUser') || 'Staff';
             document.getElementById('userDisplay').textContent = '👤 ' + user;
-            document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            loadDashboard();
+            
+            // Set date picker to today
+            var todayFormatted = new Date().toISOString().split('T')[0];
+            document.getElementById('datePicker').value = todayFormatted;
+            
+            updateDisplay();
         };
 
-        function loadDashboard() {
-            var transactions = JSON.parse(localStorage.getItem('milling_transactions')) || [];
-            var todayTxns = transactions.filter(function(t) { return t.date === today; });
-            var totalRev = todayTxns.reduce(function(s, t) { return s + t.total; }, 0);
+        function updateDisplay() {
+            // Update the display text
+            var displayDate = new Date(selectedDate);
+            document.getElementById('selectedDateDisplay').textContent = displayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('txnDateLabel').textContent = selectedDate;
+            
+            // Update date picker
+            var parts = selectedDate.split('/');
+            var formatted = parts[2] + '-' + parts[0].padStart(2,'0') + '-' + parts[1].padStart(2,'0');
+            document.getElementById('datePicker').value = formatted;
+            
+            loadDashboardForDate(selectedDate);
+        }
 
-            document.getElementById('todayRevenue').textContent = 'GHS ' + totalRev.toLocaleString();
-            document.getElementById('todayTransactions').textContent = todayTxns.length;
+        function changeDate(days) {
+            var current = new Date(selectedDate);
+            current.setDate(current.getDate() + days);
+            selectedDate = current.toLocaleDateString();
+            updateDisplay();
+        }
+
+        function onDatePicked() {
+            var val = document.getElementById('datePicker').value;
+            if (val) {
+                var d = new Date(val + 'T00:00:00');
+                selectedDate = d.toLocaleDateString();
+                updateDisplay();
+            }
+        }
+
+        function goToToday() {
+            selectedDate = new Date().toLocaleDateString();
+            updateDisplay();
+        }
+
+        function loadDashboardForDate(dateStr) {
+            var transactions = JSON.parse(localStorage.getItem('milling_transactions')) || [];
+            var dayTxns = transactions.filter(function(t) { return t.date === dateStr; });
+            var totalRev = dayTxns.reduce(function(s, t) { return s + t.total; }, 0);
+
+            document.getElementById('dayRevenue').textContent = 'GHS ' + totalRev.toLocaleString();
+            document.getElementById('dayTransactions').textContent = dayTxns.length;
 
             // Workers present
             var attendance = JSON.parse(localStorage.getItem('milling_attendance')) || [];
-            var todayAtt = attendance.filter(function(a) { return a.date === today && a.present; });
-            document.getElementById('workersPresent').textContent = todayAtt.length;
+            var dayAtt = attendance.filter(function(a) { return a.date === dateStr && a.present; });
+            document.getElementById('dayWorkers').textContent = dayAtt.length;
 
             // Expenses
             var expenses = JSON.parse(localStorage.getItem('milling_expenses')) || [];
-            var todayExp = expenses.filter(function(e) { return e.date === today; }).reduce(function(s, e) { return s + e.amount; }, 0);
-            document.getElementById('todayExpenses').textContent = 'GHS ' + todayExp.toLocaleString();
+            var dayExp = expenses.filter(function(e) { return e.date === dateStr; }).reduce(function(s, e) { return s + e.amount; }, 0);
+            document.getElementById('dayExpenses').textContent = 'GHS ' + dayExp.toLocaleString();
 
-            // Recent transactions
-            var recent = todayTxns.slice(-8).reverse();
-            var tbody = document.getElementById('recentTransactions');
+            // Transactions table
+            var recent = dayTxns.slice(-10).reverse();
+            var tbody = document.getElementById('dayTransactionsTable');
             if (recent.length > 0) {
                 var html = '';
                 recent.forEach(function(t) {
                     html += '<tr><td>' + t.time + '</td><td>' + t.machine + '</td><td>' + t.quantity + '</td><td>GHS ' + t.unitPrice.toFixed(2) + '</td><td><strong>GHS ' + t.total.toFixed(2) + '</strong></td><td><span class="badge ' + (t.status === 'Paid' ? 'badge-paid' : 'badge-pending') + '">' + t.status + '</span></td></tr>';
                 });
                 tbody.innerHTML = html;
+            } else {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No transactions for this date</td></tr>';
             }
         }
 
-        // ==================== DELETE TODAY'S DATA ====================
-        function deleteTodayData() {
-            if (!confirm('⚠️ WARNING: This will delete ALL data for ' + today + '\n\nThis includes:\n- All transactions\n- Attendance records\n- Expenses\n- Purchases\n\nThis CANNOT be undone!\n\nAre you sure?')) {
+        // ==================== DELETE SELECTED DATE DATA ====================
+        function deleteSelectedDateData() {
+            if (!confirm('⚠️ WARNING: Delete ALL data for ' + selectedDate + '?\n\nThis includes:\n- Transactions\n- Attendance\n- Expenses\n- Purchases\n\nThis CANNOT be undone!')) {
                 return;
             }
-            if (!confirm('FINAL CONFIRMATION: Delete everything for ' + today + '?')) {
+            if (!confirm('FINAL CONFIRMATION: Delete everything for ' + selectedDate + '?')) {
                 return;
             }
 
-            // Delete transactions for today
             var transactions = JSON.parse(localStorage.getItem('milling_transactions')) || [];
-            transactions = transactions.filter(function(t) { return t.date !== today; });
+            transactions = transactions.filter(function(t) { return t.date !== selectedDate; });
             localStorage.setItem('milling_transactions', JSON.stringify(transactions));
 
-            // Delete attendance for today
             var attendance = JSON.parse(localStorage.getItem('milling_attendance')) || [];
-            attendance = attendance.filter(function(a) { return a.date !== today; });
+            attendance = attendance.filter(function(a) { return a.date !== selectedDate; });
             localStorage.setItem('milling_attendance', JSON.stringify(attendance));
 
-            // Delete expenses for today
             var expenses = JSON.parse(localStorage.getItem('milling_expenses')) || [];
-            expenses = expenses.filter(function(e) { return e.date !== today; });
+            expenses = expenses.filter(function(e) { return e.date !== selectedDate; });
             localStorage.setItem('milling_expenses', JSON.stringify(expenses));
 
-            // Delete purchases for today
             var purchases = JSON.parse(localStorage.getItem('milling_purchases')) || [];
-            purchases = purchases.filter(function(p) { return p.date !== today; });
+            purchases = purchases.filter(function(p) { return p.date !== selectedDate; });
             localStorage.setItem('milling_purchases', JSON.stringify(purchases));
 
-            alert('✅ All data for ' + today + ' has been deleted!');
-            location.reload();
+            alert('✅ All data for ' + selectedDate + ' deleted!');
+            updateDisplay();
         }
 
         function logout() {
