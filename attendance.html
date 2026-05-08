@@ -4,287 +4,91 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Worker Attendance | Scan Set Milling</title>
+    <script src="auth.js"></script>
+    <script src="api_config.js"></script>
     <style>
-        :root {
-            --primary: #5d3a1a; --primary-light: #8b5e3c; --accent: #d4a574;
-            --bg: #fdf6f0; --card: #fff; --text: #3d2b1f; --text-light: #7a6a5c; --border: #e8d5c4;
-            --success: #2d6a4f; --danger: #c0392b;
-        }
+        :root { --primary: #5d3a1a; --primary-light: #8b5e3c; --accent: #d4a574; --bg: #fdf6f0; --card: #fff; --text: #3d2b1f; --text-light: #7a6a5c; --border: #e8d5c4; --success: #2d6a4f; --danger: #c0392b; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
         body { background: var(--bg); min-height: 100vh; padding-bottom: 40px; }
-
-        .navbar {
-            background: linear-gradient(135deg, #5d3a1a, #8b5e3c); color: white;
-            padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
+        .navbar { background: linear-gradient(135deg, #5d3a1a, #8b5e3c); color: white; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .navbar .brand { font-size: 18px; font-weight: 700; }
         .navbar a { color: white; text-decoration: none; font-size: 13px; background: rgba(255,255,255,0.15); padding: 7px 14px; border-radius: 6px; }
-
         .container { max-width: 700px; margin: 0 auto; padding: 20px; }
-
-        .date-banner {
-            background: var(--primary); color: white; padding: 16px 20px; border-radius: 14px;
-            text-align: center; margin-bottom: 20px; font-size: 18px; font-weight: 600;
-        }
-
-        .card {
-            background: var(--card); border-radius: 16px; padding: 22px;
-            margin-bottom: 18px; box-shadow: 0 3px 15px rgba(0,0,0,0.06);
-        }
+        .date-banner { background: var(--primary); color: white; padding: 16px 20px; border-radius: 14px; text-align: center; margin-bottom: 20px; font-size: 18px; font-weight: 600; }
+        .card { background: var(--card); border-radius: 16px; padding: 22px; margin-bottom: 18px; box-shadow: 0 3px 15px rgba(0,0,0,0.06); }
         .card h3 { color: var(--primary); font-size: 18px; margin-bottom: 16px; }
-
         .worker-list { display: grid; gap: 10px; }
-        .worker-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 14px 16px; background: #fdf9f5; border-radius: 10px; border: 1px solid var(--border);
-            transition: all 0.2s;
-        }
+        .worker-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #fdf9f5; border-radius: 10px; border: 1px solid var(--border); transition: all 0.2s; }
         .worker-row.marked-present { background: #d4edda; border-color: #2d6a4f; }
         .worker-row.marked-absent { background: #f8d7da; border-color: #c0392b; }
-
         .worker-name { font-weight: 600; color: var(--text); font-size: 15px; }
         .worker-status-group { display: flex; gap: 6px; align-items: center; }
         .status-text { font-size: 12px; font-weight: 600; margin-right: 8px; min-width: 80px; text-align: right; }
-        .status-present { color: #155724; }
-        .status-absent { color: #721c24; }
-        .status-unmarked { color: #999; }
-
-        .mark-btn {
-            padding: 8px 16px; border: 2px solid var(--border); border-radius: 20px;
-            font-weight: 600; cursor: pointer; font-size: 12px; transition: all 0.2s;
-            background: white; color: var(--text-light);
-        }
+        .status-present { color: #155724; } .status-absent { color: #721c24; } .status-unmarked { color: #999; }
+        .mark-btn { padding: 8px 16px; border: 2px solid var(--border); border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 12px; background: white; color: var(--text-light); }
         .mark-btn:hover { transform: scale(1.05); }
         .mark-btn.present-active { background: #2d6a4f; color: white; border-color: #2d6a4f; }
         .mark-btn.absent-active { background: #c0392b; color: white; border-color: #c0392b; }
-
-        .btn {
-            padding: 12px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600;
-            cursor: pointer; color: white; transition: all 0.2s;
-        }
+        .btn { padding: 12px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; color: white; }
         .btn-success { background: var(--success); width: 100%; }
-
-        .toast {
-            position: fixed; bottom: 20px; left: 20px; right: 20px;
-            background: var(--success); color: white; padding: 15px; border-radius: 12px;
-            text-align: center; z-index: 1000; display: none; animation: slideUp 0.3s;
-        }
+        .toast { position: fixed; bottom: 20px; left: 20px; right: 20px; background: var(--success); color: white; padding: 15px; border-radius: 12px; text-align: center; z-index: 1000; display: none; animation: slideUp 0.3s; }
         @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
         .summary-row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
         .summary-item { padding: 10px 16px; border-radius: 8px; font-size: 13px; }
-
-        @media (max-width: 500px) {
-            .worker-row { flex-direction: column; gap: 10px; text-align: center; }
-            .worker-status-group { justify-content: center; }
-        }
+        @media (max-width: 500px) { .worker-row { flex-direction: column; gap: 10px; text-align: center; } .worker-status-group { justify-content: center; } }
     </style>
 </head>
 <body>
-
-    <div class="navbar">
-        <div class="brand">👷 Worker Attendance</div>
-        <a href="dashboard.html">🔙 Dashboard</a>
-    </div>
-
+    <div class="navbar"><div class="brand">👷 Worker Attendance</div><a href="dashboard.html">🔙 Dashboard</a></div>
     <div class="container">
-
         <div class="date-banner">📅 <span id="currentDate"></span></div>
-
         <div class="card">
             <h3>📝 Mark Today's Attendance</h3>
-            
             <div class="summary-row">
                 <div class="summary-item" style="background:#f0fdf4;">👷 Total: <strong id="totalWorkers">0</strong></div>
                 <div class="summary-item" style="background:#d4edda;">✅ Present: <strong id="countPresent">0</strong></div>
                 <div class="summary-item" style="background:#f8d7da;">❌ Absent: <strong id="countAbsent">0</strong></div>
                 <div class="summary-item" style="background:#fefce8;">⬜ Unmarked: <strong id="countUnmarked">0</strong></div>
             </div>
-
-            <div class="worker-list" id="attendanceList">
-                <p style="color:#999;text-align:center;">Loading workers...</p>
-            </div>
-
-            <div style="margin-top:18px;">
-                <button class="btn btn-success" onclick="saveAttendance()">💾 Save Attendance</button>
-            </div>
+            <div class="worker-list" id="attendanceList"><p style="color:#999;text-align:center;">Loading workers...</p></div>
+            <div style="margin-top:18px;"><button class="btn btn-success" onclick="saveAttendance()">💾 Save Attendance</button></div>
         </div>
-
         <div class="card">
             <h3>📋 Recent Records</h3>
-            <div style="overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse;font-size:12px;">
-                    <thead><tr style="background:var(--primary);color:white;"><th style="padding:8px;">Date</th><th style="padding:8px;">Worker</th><th style="padding:8px;">Status</th></tr></thead>
-                    <tbody id="recentRecords"><tr><td colspan="3" style="text-align:center;color:#999;padding:15px;">No records yet</td></tr></tbody>
-                </table>
-            </div>
+            <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:var(--primary);color:white;"><th style="padding:8px;">Date</th><th style="padding:8px;">Worker</th><th style="padding:8px;">Status</th></tr></thead><tbody id="recentRecords"><tr><td colspan="3" style="text-align:center;color:#999;padding:15px;">No records yet</td></tr></tbody></table></div>
         </div>
     </div>
-
     <div class="toast" id="toast"></div>
-
-    <script src="api_config.js"></script>
-<script>
-    var today = new Date().toLocaleDateString();
-    var attendance = {};
-    var allWorkers = [];
-
-    window.onload = async function() {
-        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        await loadData();
-    };
-
-    async function loadData() {
-        // Load workers from Google Sheets
-        allWorkers = await apiGet('getWorkers');
-        allWorkers = Array.isArray(allWorkers) ? allWorkers : [];
-
-        // Load today's attendance
-        var attData = await apiGet('getAttendance');
-        attData = Array.isArray(attData) ? attData : [];
-        var todayRecords = attData.filter(function(a) { return (a.Date || a.date) === today; });
-
-        attendance = {};
-        todayRecords.forEach(function(r) {
-            var name = r.WorkerName || r.workerName;
-            var present = r.Present === 'true' || r.Present === true || r.present === true;
-            attendance[name] = present;
-        });
-
-        renderAttendanceList();
-        loadRecentRecords(attData);
-    }
-
-    function renderAttendanceList() {
-        var list = document.getElementById('attendanceList');
-        if (allWorkers.length === 0) {
-            list.innerHTML = '<p style="color:#999;text-align:center;">No workers added. Go to <a href="#" onclick="goToAdmin(); return false;">Admin Panel</a> to add workers.</p>';
-            updateCounts();
-            return;
+    <script>
+        var today = new Date().toLocaleDateString(); var attendance = {}; var allWorkers = [];
+        window.onload = async function() { document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); await loadData(); };
+        async function loadData() {
+            allWorkers = await apiGet('getWorkers'); allWorkers = Array.isArray(allWorkers) ? allWorkers : [];
+            var attData = await apiGet('getAttendance'); attData = Array.isArray(attData) ? attData : [];
+            var todayRecords = attData.filter(function(a) { return (a.Date || a.date) === today; });
+            attendance = {}; todayRecords.forEach(function(r) { var n = r.WorkerName || r.workerName; attendance[n] = (r.Present === 'true' || r.Present === true || r.present === true); });
+            renderList(); loadRecentRecords(attData);
         }
-
-        var html = '';
-        allWorkers.forEach(function(w) {
-            var workerName = w.Name || w.name;
-            var isMarked = attendance.hasOwnProperty(workerName);
-            var isPresent = isMarked ? attendance[workerName] : null;
-            var rowClass = '';
-            var statusHTML = '';
-
-            if (isMarked) {
-                rowClass = isPresent ? 'marked-present' : 'marked-absent';
-                statusHTML = '<span class="status-text ' + (isPresent ? 'status-present' : 'status-absent') + '">' + (isPresent ? '✅ Present' : '❌ Absent') + '</span>';
-            } else {
-                statusHTML = '<span class="status-text status-unmarked">⬜ Not marked</span>';
-            }
-
-            var safeName = workerName.replace(/\s/g, '_').replace(/"/g, '&quot;');
-            html += '<div class="worker-row ' + rowClass + '" id="row_' + safeName + '">';
-            html += '<span class="worker-name">👷 ' + workerName + '</span>';
-            html += '<div class="worker-status-group">';
-            html += statusHTML;
-            html += '<button class="mark-btn ' + (isMarked && isPresent ? 'present-active' : '') + '" data-worker="' + workerName.replace(/"/g, '&quot;') + '" data-status="present">✅ Present</button>';
-            html += '<button class="mark-btn ' + (isMarked && !isPresent ? 'absent-active' : '') + '" data-worker="' + workerName.replace(/"/g, '&quot;') + '" data-status="absent">❌ Absent</button>';
-            html += '</div></div>';
-        });
-
-        list.innerHTML = html;
-
-        // Add click events
-        var allButtons = list.querySelectorAll('.mark-btn');
-        allButtons.forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var workerName = this.getAttribute('data-worker');
-                var status = this.getAttribute('data-status');
-                markWorker(workerName, status === 'present');
+        function renderList() {
+            var list = document.getElementById('attendanceList');
+            if (allWorkers.length === 0) { list.innerHTML = '<p style="color:#999;text-align:center;">No workers added.</p>'; updateCounts(); return; }
+            var html = '';
+            allWorkers.forEach(function(w) {
+                var name = w.Name || w.name; var isMarked = attendance.hasOwnProperty(name); var isPresent = isMarked ? attendance[name] : null;
+                var rowClass = ''; var statusHTML = '';
+                if (isMarked) { rowClass = isPresent ? 'marked-present' : 'marked-absent'; statusHTML = '<span class="status-text ' + (isPresent ? 'status-present' : 'status-absent') + '">' + (isPresent ? '✅ Present' : '❌ Absent') + '</span>'; }
+                else { statusHTML = '<span class="status-text status-unmarked">⬜ Not marked</span>'; }
+                html += '<div class="worker-row ' + rowClass + '" id="row_' + name.replace(/\s/g,'_') + '"><span class="worker-name">👷 ' + name + '</span><div class="worker-status-group">' + statusHTML + '<button class="mark-btn ' + (isMarked && isPresent ? 'present-active' : '') + '" data-worker="' + name.replace(/"/g,'&quot;') + '" data-status="present">✅ Present</button><button class="mark-btn ' + (isMarked && !isPresent ? 'absent-active' : '') + '" data-worker="' + name.replace(/"/g,'&quot;') + '" data-status="absent">❌ Absent</button></div></div>';
             });
-        });
-
-        updateCounts();
-    }
-
-    function markWorker(name, present) {
-        attendance[name] = present;
-        var safeName = name.replace(/\s/g, '_');
-        var row = document.getElementById('row_' + safeName);
-
-        if (row) {
-            row.classList.remove('marked-present', 'marked-absent');
-            if (present) { row.classList.add('marked-present'); }
-            else { row.classList.add('marked-absent'); }
-
-            var statusSpan = row.querySelector('.status-text');
-            if (statusSpan) {
-                if (present) {
-                    statusSpan.textContent = '✅ Present';
-                    statusSpan.className = 'status-text status-present';
-                } else {
-                    statusSpan.textContent = '❌ Absent';
-                    statusSpan.className = 'status-text status-absent';
-                }
-            }
-
-            var buttons = row.querySelectorAll('.mark-btn');
-            if (buttons.length >= 2) {
-                buttons[0].classList.remove('present-active');
-                buttons[1].classList.remove('absent-active');
-                if (present) { buttons[0].classList.add('present-active'); }
-                else { buttons[1].classList.add('absent-active'); }
-            }
+            list.innerHTML = html;
+            list.querySelectorAll('.mark-btn').forEach(function(btn) { btn.addEventListener('click', function() { markWorker(this.getAttribute('data-worker'), this.getAttribute('data-status') === 'present'); }); });
+            updateCounts();
         }
-
-        updateCounts();
-    }
-
-    function updateCounts() {
-        var present = 0, absent = 0, unmarked = 0;
-        allWorkers.forEach(function(w) {
-            var name = w.Name || w.name;
-            if (attendance.hasOwnProperty(name)) {
-                if (attendance[name]) present++; else absent++;
-            } else { unmarked++; }
-        });
-        document.getElementById('totalWorkers').textContent = allWorkers.length;
-        document.getElementById('countPresent').textContent = present;
-        document.getElementById('countAbsent').textContent = absent;
-        document.getElementById('countUnmarked').textContent = unmarked;
-    }
-
-    async function saveAttendance() {
-        var records = [];
-        allWorkers.forEach(function(w) {
-            var name = w.Name || w.name;
-            if (attendance.hasOwnProperty(name)) {
-                records.push({ workerName: name, date: today, present: attendance[name] });
-            }
-        });
-
-        await apiPost('saveAttendance', records);
-        var attData = await apiGet('getAttendance');
-        attData = Array.isArray(attData) ? attData : [];
-        loadRecentRecords(attData);
-        showToast('✅ Attendance saved! ' + records.length + ' worker(s) recorded.');
-    }
-
-    function loadRecentRecords(attData) {
-        attData.sort(function(a, b) { return new Date(b.Date || b.date) - new Date(a.Date || a.date); });
-        var recent = attData.slice(0, 20);
-        var tbody = document.getElementById('recentRecords');
-        var html = '';
-        recent.forEach(function(r) {
-            var date = r.Date || r.date || '';
-            var name = r.WorkerName || r.workerName || '';
-            var present = r.Present === 'true' || r.Present === true || r.present === true;
-            html += '<tr><td style="padding:6px 8px;">' + date + '</td><td style="padding:6px 8px;">' + name + '</td><td style="padding:6px 8px;">' + (present ? '✅ Present' : '❌ Absent') + '</td></tr>';
-        });
-        tbody.innerHTML = html || '<tr><td colspan="3" style="text-align:center;color:#999;padding:15px;">No records yet</td></tr>';
-    }
-
-    function showToast(msg) {
-        var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
-        setTimeout(function() { t.style.display = 'none'; }, 2500);
-    }
-</script>
+        function markWorker(name, present) { attendance[name] = present; var row = document.getElementById('row_' + name.replace(/\s/g,'_')); if (row) { row.classList.remove('marked-present','marked-absent'); row.classList.add(present ? 'marked-present' : 'marked-absent'); var sp = row.querySelector('.status-text'); if (sp) { sp.textContent = present ? '✅ Present' : '❌ Absent'; sp.className = 'status-text ' + (present ? 'status-present' : 'status-absent'); } var btns = row.querySelectorAll('.mark-btn'); btns[0].classList.remove('present-active'); btns[1].classList.remove('absent-active'); if (present) btns[0].classList.add('present-active'); else btns[1].classList.add('absent-active'); } updateCounts(); }
+        function updateCounts() { var p = 0, a = 0, u = 0; allWorkers.forEach(function(w) { var n = w.Name || w.name; if (attendance.hasOwnProperty(n)) { if (attendance[n]) p++; else a++; } else u++; }); document.getElementById('totalWorkers').textContent = allWorkers.length; document.getElementById('countPresent').textContent = p; document.getElementById('countAbsent').textContent = a; document.getElementById('countUnmarked').textContent = u; }
+        async function saveAttendance() { var records = []; allWorkers.forEach(function(w) { var n = w.Name || w.name; if (attendance.hasOwnProperty(n)) records.push({ workerName: n, date: today, present: attendance[n] }); }); await apiPost('saveAttendance', records); var attData = await apiGet('getAttendance'); attData = Array.isArray(attData) ? attData : []; loadRecentRecords(attData); showToast('✅ Saved! ' + records.length + ' worker(s).'); }
+        function loadRecentRecords(attData) { attData.sort(function(a,b){ return new Date(b.Date||b.date) - new Date(a.Date||a.date); }); var tbody = document.getElementById('recentRecords'); var html = ''; attData.slice(0,20).forEach(function(r) { html += '<tr><td style="padding:6px 8px;">' + (r.Date||r.date||'') + '</td><td style="padding:6px 8px;">' + (r.WorkerName||r.workerName||'') + '</td><td style="padding:6px 8px;">' + ((r.Present==='true'||r.Present===true||r.present===true) ? '✅ Present' : '❌ Absent') + '</td></tr>'; }); tbody.innerHTML = html || '<tr><td colspan="3" style="text-align:center;color:#999;">No records</td></tr>'; }
+        function showToast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(function() { t.style.display = 'none'; }, 2500); }
+    </script>
 </body>
 </html>
