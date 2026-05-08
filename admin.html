@@ -180,6 +180,16 @@
     <div class="toast" id="toast"></div>
 
     <script>
+        // Password check on page load
+if (!sessionStorage.getItem('admin_verified')) {
+    var password = prompt('🔐 Admin Access Required\n\nEnter admin password:');
+    if (password !== 'admin123') {
+        alert('❌ Incorrect password! Access denied.');
+        window.location.href = 'dashboard.html';
+        throw new Error('Access denied');
+    }
+    sessionStorage.setItem('admin_verified', 'true');
+}
         // ==================== INIT ====================
         window.onload = function() {
             loadMachinesTable();
