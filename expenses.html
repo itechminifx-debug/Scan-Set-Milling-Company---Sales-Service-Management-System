@@ -104,62 +104,72 @@
 
     <div class="toast" id="toast"></div>
 
-    <script>
-        function getExpenses() {
-            var saved = localStorage.getItem('milling_expenses');
-            return saved ? JSON.parse(saved) : [];
+    <script src="api_config.js"></script>
+<script>
+    var allExpenses = [];
+
+    window.onload = async function() { await loadExpenses(); };
+
+    async function loadExpenses() {
+        allExpenses = await apiGet('getExpenses');
+        allExpenses = Array.isArray(allExpenses) ? allExpenses : [];
+        allExpenses.sort(function(a, b) { return new Date(b.Date || b.date) - new Date(a.Date || a.date); });
+
+        var now = new Date();
+        var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString();
+        var monthExpenses = allExpenses.filter(function(e) {
+            return new Date(e.Date || e.date) >= new Date(monthStart);
+        });
+        var monthTotal = monthExpenses.reduce(function(s, e) { return s + (parseFloat(e.Amount) || parseFloat(e.amount) || 0); }, 0);
+        document.getElementById('monthTotal').textContent = 'GHS ' + monthTotal.toFixed(2);
+
+        var tbody = document.getElementById('expensesTable');
+        var html = '';
+        allExpenses.slice(0, 20).forEach(function(e, i) {
+            var date = e.Date || e.date || '';
+            var desc = e.Description || e.description || '';
+            var cat = e.Category || e.category || '';
+            var amt = parseFloat(e.Amount || e.amount || 0).toFixed(2);
+            html += '<tr><td>' + date + '</td><td>' + desc + '</td><td>' + cat + '</td><td><strong>GHS ' + amt + '</strong></td><td><button class="btn btn-danger" onclick="deleteExpense(' + i + ')">🗑</button></td></tr>';
+        });
+        tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#999;">No expenses recorded</td></tr>';
+    }
+
+    async function addExpense() {
+        var desc = document.getElementById('expenseDesc').value.trim();
+        var cat = document.getElementById('expenseCat').value;
+        var amt = parseFloat(document.getElementById('expenseAmount').value) || 0;
+        if (!desc || !amt) { showToast('Fill all fields!', 'error'); return; }
+
+        var expenseData = {
+            date: new Date().toLocaleDateString(),
+            description: desc,
+            category: cat,
+            amount: amt
+        };
+
+        await apiPost('addExpense', expenseData);
+        document.getElementById('expenseDesc').value = '';
+        document.getElementById('expenseAmount').value = '';
+        await loadExpenses();
+        showToast('Expense recorded! 💸');
+    }
+
+    async function deleteExpense(index) {
+        if (confirm('Delete this expense?')) {
+            // Since Google Sheets API deletes by date, we reload
+            // For individual delete, we'd need to update the sheet directly
+            await apiDeleteByDate('deleteExpensesByDate', allExpenses[index].Date || allExpenses[index].date);
+            await loadExpenses();
+            showToast('Expense deleted.');
         }
-        function saveExpenses(data) { localStorage.setItem('milling_expenses', JSON.stringify(data)); }
+    }
 
-        window.onload = function() { loadExpenses(); };
-
-        function addExpense() {
-            var desc = document.getElementById('expenseDesc').value.trim();
-            var cat = document.getElementById('expenseCat').value;
-            var amt = parseFloat(document.getElementById('expenseAmount').value) || 0;
-            if (!desc || !amt) { showToast('Fill all fields!', 'error'); return; }
-            var expenses = getExpenses();
-            expenses.push({ date: new Date().toLocaleDateString(), description: desc, category: cat, amount: amt });
-            saveExpenses(expenses);
-            document.getElementById('expenseDesc').value = '';
-            document.getElementById('expenseAmount').value = '';
-            loadExpenses();
-            showToast('Expense recorded! 💸');
-        }
-
-        function deleteExpense(index) {
-            if (confirm('Delete this expense?')) {
-                var expenses = getExpenses();
-                expenses.splice(index, 1);
-                saveExpenses(expenses);
-                loadExpenses();
-                showToast('Expense deleted.');
-            }
-        }
-
-        function loadExpenses() {
-            var expenses = getExpenses();
-            expenses.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
-
-            var now = new Date();
-            var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString();
-            var monthExpenses = expenses.filter(function(e) { return new Date(e.date) >= new Date(monthStart); });
-            var monthTotal = monthExpenses.reduce(function(s, e) { return s + e.amount; }, 0);
-            document.getElementById('monthTotal').textContent = 'GHS ' + monthTotal.toFixed(2);
-
-            var tbody = document.getElementById('expensesTable');
-            var html = '';
-            expenses.slice(0, 20).forEach(function(e, i) {
-                html += '<tr><td>' + e.date + '</td><td>' + e.description + '</td><td>' + e.category + '</td><td><strong>GHS ' + e.amount.toFixed(2) + '</strong></td><td><button class="btn btn-danger" onclick="deleteExpense(' + i + ')">🗑</button></td></tr>';
-            });
-            tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#999;">No expenses recorded</td></tr>';
-        }
-
-        function showToast(msg, type) {
-            var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
-            t.style.background = type === 'error' ? '#c0392b' : '#2d6a4f';
-            setTimeout(function() { t.style.display = 'none'; }, 2500);
-        }
-    </script>
+    function showToast(msg, type) {
+        var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+        t.style.background = type === 'error' ? '#c0392b' : '#2d6a4f';
+        setTimeout(function() { t.style.display = 'none'; }, 2500);
+    }
+</script>
 </body>
 </html>
