@@ -87,66 +87,113 @@
             </div>
         </div>
     </div>
-    <script>
-        var selectedDate = new Date().toLocaleDateString();
-        window.onload = function() {
-            var user = localStorage.getItem('currentUser') || 'Staff';
-            document.getElementById('userDisplay').textContent = '👤 ' + user;
-            var todayFormatted = new Date().toISOString().split('T')[0];
-            document.getElementById('datePicker').value = todayFormatted;
-            updateDisplay();
-        };
-        function updateDisplay() {
-            var displayDate = new Date(selectedDate);
-            document.getElementById('selectedDateDisplay').textContent = displayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            document.getElementById('txnDateLabel').textContent = selectedDate;
-            var parts = selectedDate.split('/');
-            var formatted = parts[2] + '-' + parts[0].padStart(2,'0') + '-' + parts[1].padStart(2,'0');
-            document.getElementById('datePicker').value = formatted;
-            loadDashboardForDate(selectedDate);
-        }
-        function changeDate(days) { var current = new Date(selectedDate); current.setDate(current.getDate() + days); selectedDate = current.toLocaleDateString(); updateDisplay(); }
-        function onDatePicked() { var val = document.getElementById('datePicker').value; if (val) { var d = new Date(val + 'T00:00:00'); selectedDate = d.toLocaleDateString(); updateDisplay(); } }
-        function goToToday() { selectedDate = new Date().toLocaleDateString(); updateDisplay(); }
-        function loadDashboardForDate(dateStr) {
-            var transactions = JSON.parse(localStorage.getItem('milling_transactions')) || [];
-            var dayTxns = transactions.filter(function(t) { return t.date === dateStr; });
-            var totalRev = dayTxns.reduce(function(s, t) { return s + t.total; }, 0);
-            document.getElementById('dayRevenue').textContent = 'GHS ' + totalRev.toLocaleString();
-            document.getElementById('dayTransactions').textContent = dayTxns.length;
-            var attendance = JSON.parse(localStorage.getItem('milling_attendance')) || [];
-            var dayAtt = attendance.filter(function(a) { return a.date === dateStr && a.present; });
-            document.getElementById('dayWorkers').textContent = dayAtt.length;
-            var expenses = JSON.parse(localStorage.getItem('milling_expenses')) || [];
-            var dayExp = expenses.filter(function(e) { return e.date === dateStr; }).reduce(function(s, e) { return s + e.amount; }, 0);
-            document.getElementById('dayExpenses').textContent = 'GHS ' + dayExp.toLocaleString();
-            var recent = dayTxns.slice(-10).reverse();
-            var tbody = document.getElementById('dayTransactionsTable');
-            if (recent.length > 0) {
-                var html = '';
-                recent.forEach(function(t) { html += '<tr><td>' + t.time + '</td><td>' + t.machine + '</td><td>' + t.quantity + '</td><td>GHS ' + t.unitPrice.toFixed(2) + '</td><td><strong>GHS ' + t.total.toFixed(2) + '</strong></td><td><span class="badge ' + (t.status === 'Paid' ? 'badge-paid' : 'badge-pending') + '">' + t.status + '</span></td></tr>'; });
-                tbody.innerHTML = html;
-            } else { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No transactions for this date</td></tr>'; }
-        }
-        function deleteSelectedDateData() {
-            if (!confirm('⚠️ Delete ALL data for ' + selectedDate + '?\n\nTransactions, Attendance, Expenses, Purchases\n\nThis CANNOT be undone!')) return;
-            if (!confirm('FINAL CONFIRMATION?')) return;
-            var txns = JSON.parse(localStorage.getItem('milling_transactions')) || [];
-            txns = txns.filter(function(t) { return t.date !== selectedDate; });
-            localStorage.setItem('milling_transactions', JSON.stringify(txns));
-            var att = JSON.parse(localStorage.getItem('milling_attendance')) || [];
-            att = att.filter(function(a) { return a.date !== selectedDate; });
-            localStorage.setItem('milling_attendance', JSON.stringify(att));
-            var exp = JSON.parse(localStorage.getItem('milling_expenses')) || [];
-            exp = exp.filter(function(e) { return e.date !== selectedDate; });
-            localStorage.setItem('milling_expenses', JSON.stringify(exp));
-            var pur = JSON.parse(localStorage.getItem('milling_purchases')) || [];
-            pur = pur.filter(function(p) { return p.date !== selectedDate; });
-            localStorage.setItem('milling_purchases', JSON.stringify(pur));
-            alert('✅ All data for ' + selectedDate + ' deleted!');
+    <script src="api_config.js"></script>
+<script>
+    var selectedDate = new Date().toLocaleDateString();
+
+    window.onload = function() {
+        var user = localStorage.getItem('currentUser') || 'Staff';
+        document.getElementById('userDisplay').textContent = '👤 ' + user;
+        var todayFormatted = new Date().toISOString().split('T')[0];
+        document.getElementById('datePicker').value = todayFormatted;
+        updateDisplay();
+    };
+
+    function updateDisplay() {
+        var displayDate = new Date(selectedDate);
+        document.getElementById('selectedDateDisplay').textContent = displayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        document.getElementById('txnDateLabel').textContent = selectedDate;
+        var parts = selectedDate.split('/');
+        var formatted = parts[2] + '-' + parts[0].padStart(2,'0') + '-' + parts[1].padStart(2,'0');
+        document.getElementById('datePicker').value = formatted;
+        loadDashboardForDate(selectedDate);
+    }
+
+    function changeDate(days) {
+        var current = new Date(selectedDate);
+        current.setDate(current.getDate() + days);
+        selectedDate = current.toLocaleDateString();
+        updateDisplay();
+    }
+
+    function onDatePicked() {
+        var val = document.getElementById('datePicker').value;
+        if (val) {
+            var d = new Date(val + 'T00:00:00');
+            selectedDate = d.toLocaleDateString();
             updateDisplay();
         }
-        function logout() { localStorage.removeItem('currentUser'); window.location.href = 'index.html'; }
-    </script>
+    }
+
+    function goToToday() {
+        selectedDate = new Date().toLocaleDateString();
+        updateDisplay();
+    }
+
+    async function loadDashboardForDate(dateStr) {
+        // Load transactions from Google Sheets
+        var transactions = await apiGet('getTransactions');
+        transactions = Array.isArray(transactions) ? transactions : [];
+
+        var dayTxns = transactions.filter(function(t) { return (t.Date || t.date) === dateStr; });
+        var totalRev = dayTxns.reduce(function(s, t) { return s + (parseFloat(t.Total) || parseFloat(t.total) || 0); }, 0);
+
+        document.getElementById('dayRevenue').textContent = 'GHS ' + totalRev.toLocaleString();
+        document.getElementById('dayTransactions').textContent = dayTxns.length;
+
+        // Load attendance
+        var attendance = await apiGet('getAttendance');
+        attendance = Array.isArray(attendance) ? attendance : [];
+        var dayAtt = attendance.filter(function(a) {
+            return (a.Date || a.date) === dateStr && (a.Present === 'true' || a.Present === true || a.present === true);
+        });
+        document.getElementById('dayWorkers').textContent = dayAtt.length;
+
+        // Load expenses
+        var expenses = await apiGet('getExpenses');
+        expenses = Array.isArray(expenses) ? expenses : [];
+        var dayExp = expenses.filter(function(e) { return (e.Date || e.date) === dateStr; })
+            .reduce(function(s, e) { return s + (parseFloat(e.Amount) || parseFloat(e.amount) || 0); }, 0);
+        document.getElementById('dayExpenses').textContent = 'GHS ' + dayExp.toLocaleString();
+
+        // Display transactions table
+        var recent = dayTxns.slice(-10).reverse();
+        var tbody = document.getElementById('dayTransactionsTable');
+        if (recent.length > 0) {
+            var html = '';
+            recent.forEach(function(t) {
+                var time = t.Time || t.time || '';
+                var machine = t.Machine || t.machine || '';
+                var qty = t.Quantity || t.quantity || '';
+                var price = parseFloat(t.UnitPrice || t.unitPrice || 0).toFixed(2);
+                var total = parseFloat(t.Total || t.total || 0).toFixed(2);
+                var status = t.Status || t.status || 'Paid';
+                var badgeClass = status === 'Paid' ? 'badge-paid' : 'badge-pending';
+                html += '<tr><td>' + time + '</td><td>' + machine + '</td><td>' + qty + '</td><td>GHS ' + price + '</td><td><strong>GHS ' + total + '</strong></td><td><span class="badge ' + badgeClass + '">' + status + '</span></td></tr>';
+            });
+            tbody.innerHTML = html;
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No transactions for this date</td></tr>';
+        }
+    }
+
+    // Delete selected date data from Google Sheets
+    async function deleteSelectedDateData() {
+        if (!confirm('⚠️ Delete ALL data for ' + selectedDate + '?\n\nTransactions, Attendance, Expenses, Purchases\n\nThis CANNOT be undone!')) return;
+        if (!confirm('FINAL CONFIRMATION?')) return;
+
+        await apiDeleteByDate('deleteTransactionsByDate', selectedDate);
+        await apiDeleteByDate('deleteExpensesByDate', selectedDate);
+        await apiDeleteByDate('deletePurchasesByDate', selectedDate);
+
+        alert('✅ All data for ' + selectedDate + ' deleted!');
+        updateDisplay();
+    }
+
+    function logout() {
+        localStorage.removeItem('currentUser');
+        window.location.href = 'index.html';
+    }
+</script>
 </body>
 </html>
