@@ -179,237 +179,174 @@
 
     <div class="toast" id="toast"></div>
 
-    <script>
-        // Password check on page load
-if (!sessionStorage.getItem('admin_verified')) {
-    var password = prompt('🔐 Admin Access Required\n\nEnter admin password:');
-    if (password !== 'admin123') {
-        alert('❌ Incorrect password! Access denied.');
-        window.location.href = 'dashboard.html';
-        throw new Error('Access denied');
+   <script src="api_config.js"></script>
+<script>
+    // Password check on page load
+    if (!sessionStorage.getItem('admin_verified')) {
+        var password = prompt('🔐 Admin Access Required\n\nEnter admin password:');
+        if (password !== 'admin123') {
+            alert('❌ Incorrect password! Access denied.');
+            window.location.href = 'dashboard.html';
+            throw new Error('Access denied');
+        }
+        sessionStorage.setItem('admin_verified', 'true');
     }
-    sessionStorage.setItem('admin_verified', 'true');
-}
-        // ==================== INIT ====================
-        window.onload = function() {
-            loadMachinesTable();
-            loadWorkersTable();
-            loadUsersTable();
+
+    var machines = [];
+    var workers = [];
+    var users = [];
+    var classLevels = []; // Not used but kept for compatibility
+
+    window.onload = async function() {
+        await loadAllData();
+    };
+
+    async function loadAllData() {
+        machines = await apiGet('getMachines');
+        machines = Array.isArray(machines) ? machines : [];
+
+        workers = await apiGet('getWorkers');
+        workers = Array.isArray(workers) ? workers : [];
+
+        users = await apiGet('getUsers');
+        users = Array.isArray(users) ? users : [];
+
+        loadMachinesTable();
+        loadWorkersTable();
+        loadUsersTable();
+    }
+
+    function switchTab(name) {
+        document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+        event.target.classList.add('active');
+        document.getElementById('panel-' + name).classList.add('active');
+    }
+
+    // ==================== MACHINES ====================
+    async function addMachine() {
+        var name = document.getElementById('machineName').value.trim();
+        var unit = document.getElementById('machineUnit').value;
+        var price = parseFloat(document.getElementById('machinePrice').value) || 0;
+        if (!name) { showToast('Enter machine name!', 'error'); return; }
+
+        await apiPost('addMachine', { name: name, unit: unit, price: price });
+        document.getElementById('machineName').value = '';
+        document.getElementById('machinePrice').value = '';
+        await loadAllData();
+        showToast('Machine added! ✅');
+    }
+
+    async function deleteMachine(index) {
+        if (confirm('Delete this machine?')) {
+            await apiDeleteByIndex('deleteMachine', index);
+            await loadAllData();
+            showToast('Machine deleted.');
+        }
+    }
+
+    function loadMachinesTable() {
+        var tbody = document.getElementById('machinesTableBody');
+        var html = '';
+        machines.forEach(function(m, i) {
+            var name = m.Name || m.name || '';
+            var unit = m.Unit || m.unit || '';
+            var price = parseFloat(m.Price || m.price || 0).toFixed(2);
+            html += '<tr><td><strong>' + name + '</strong></td><td>' + unit + '</td><td>GHS ' + price + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteMachine(' + i + ')">🗑 Delete</button></td></tr>';
+        });
+        tbody.innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No machines added.</td></tr>';
+    }
+
+    // ==================== WORKERS ====================
+    async function addWorker() {
+        var name = document.getElementById('workerName').value.trim();
+        var rate = parseFloat(document.getElementById('workerRate').value) || 0;
+        if (!name) { showToast('Enter worker name!', 'error'); return; }
+
+        await apiPost('addWorker', { name: name, dailyRate: rate });
+        document.getElementById('workerName').value = '';
+        document.getElementById('workerRate').value = '';
+        await loadAllData();
+        showToast('Worker added! ✅');
+    }
+
+    async function deleteWorker(index) {
+        if (confirm('Delete this worker?')) {
+            await apiDeleteByIndex('deleteWorker', index);
+            await loadAllData();
+            showToast('Worker deleted.');
+        }
+    }
+
+    function loadWorkersTable() {
+        var tbody = document.getElementById('workersTableBody');
+        var html = '';
+        workers.forEach(function(w, i) {
+            var name = w.Name || w.name || '';
+            var rate = parseFloat(w.DailyRate || w.dailyRate || 0).toFixed(2);
+            html += '<tr><td>' + (i + 1) + '</td><td>' + name + '</td><td>GHS ' + rate + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteWorker(' + i + ')">🗑 Delete</button></td></tr>';
+        });
+        tbody.innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No workers added.</td></tr>';
+    }
+
+    // ==================== USERS ====================
+    async function addUser() {
+        var name = document.getElementById('newUserName').value.trim();
+        var pass = document.getElementById('newUserPass').value || '1234';
+        if (!name) { showToast('Enter user name!', 'error'); return; }
+
+        await apiPost('addUser', { name: name, password: pass });
+        document.getElementById('newUserName').value = '';
+        document.getElementById('newUserPass').value = '1234';
+        await loadAllData();
+        showToast('User added! ✅');
+    }
+
+    async function deleteUser(index) {
+        if (confirm('Delete this user?')) {
+            await apiDeleteByIndex('deleteUser', index);
+            await loadAllData();
+            showToast('User deleted.');
+        }
+    }
+
+    function loadUsersTable() {
+        var tbody = document.getElementById('usersTableBody');
+        var html = '';
+        users.forEach(function(u, i) {
+            var name = u.Name || u.name || '';
+            var pass = u.Password || u.password || '1234';
+            html += '<tr><td>' + (i + 1) + '</td><td>' + name + '</td><td>' + pass + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteUser(' + i + ')">🗑 Delete</button></td></tr>';
+        });
+        tbody.innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No users added.</td></tr>';
+    }
+
+    // ==================== BACKUP ====================
+    async function backupAll() {
+        var data = {
+            machines: machines,
+            workers: workers,
+            users: users,
+            transactions: await apiGet('getTransactions'),
+            attendance: await apiGet('getAttendance'),
+            expenses: await apiGet('getExpenses'),
+            purchases: await apiGet('getPurchases'),
+            workerPayments: await apiGet('getWorkerPayments'),
+            breadCustomers: await apiGet('getBreadCustomers'),
+            breadBags: await apiGet('getBreadBags')
         };
+        var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a'); a.href = url; a.download = 'scanset_backup_' + new Date().toISOString().slice(0,10) + '.json';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        showToast('✅ Backup downloaded!');
+    }
 
-        function switchTab(name) {
-            document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-            document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
-            event.target.classList.add('active');
-            document.getElementById('panel-' + name).classList.add('active');
-            if (name === 'workers') loadWorkersTable();
-            if (name === 'users') loadUsersTable();
-        }
-
-        // ==================== MACHINES ====================
-        function getMachines() {
-            var saved = localStorage.getItem('milling_machines');
-            if (saved) { try { return JSON.parse(saved); } catch(e) {} }
-            var defaults = [
-                { name: 'Corn Mill - Dry', price: 2.00, unit: 'bowl(s)' },
-                { name: 'Corn Mill - Wet', price: 3.00, unit: 'bowl(s)' },
-                { name: 'Palm Nut Peeler', price: 5.00, unit: 'bucket(s)' },
-                { name: 'Palm Nut Masher', price: 5.00, unit: 'bucket(s)' },
-                { name: 'Granite Machine', price: 10.00, unit: 'load(s)' },
-                { name: 'Fufu Machine', price: 5.00, unit: 'wrap(s)' },
-                { name: 'Kokonte Machine', price: 3.00, unit: 'bowl(s)' },
-                { name: 'Pepper Machine - White', price: 2.00, unit: 'bowl(s)' },
-                { name: 'Pepper Machine - Dry', price: 2.00, unit: 'bowl(s)' },
-                { name: 'Bread Rolling Machine', price: 1.00, unit: 'piece(s)' },
-                { name: 'Cassava Milling', price: 3.00, unit: 'bowl(s)' }
-            ];
-            localStorage.setItem('milling_machines', JSON.stringify(defaults));
-            return defaults;
-        }
-
-        function saveMachines(machines) {
-            localStorage.setItem('milling_machines', JSON.stringify(machines));
-        }
-
-        function addMachine() {
-            var name = document.getElementById('machineName').value.trim();
-            var unit = document.getElementById('machineUnit').value;
-            var price = parseFloat(document.getElementById('machinePrice').value) || 0;
-            if (!name) { showToast('Enter machine name!', 'error'); return; }
-            var machines = getMachines();
-            machines.push({ name: name, unit: unit, price: price });
-            saveMachines(machines);
-            document.getElementById('machineName').value = '';
-            document.getElementById('machinePrice').value = '';
-            loadMachinesTable();
-            showToast('Machine added! ✅');
-        }
-
-        function deleteMachine(index) {
-            if (confirm('Delete this machine?')) {
-                var machines = getMachines();
-                machines.splice(index, 1);
-                saveMachines(machines);
-                loadMachinesTable();
-                showToast('Machine deleted.');
-            }
-        }
-
-        function loadMachinesTable() {
-            var machines = getMachines();
-            var tbody = document.getElementById('machinesTableBody');
-            var html = '';
-            machines.forEach(function(m, i) {
-                html += '<tr><td><strong>' + m.name + '</strong></td><td>' + m.unit + '</td><td>GHS ' + m.price.toFixed(2) + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteMachine(' + i + ')">🗑 Delete</button></td></tr>';
-            });
-            tbody.innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No machines added.</td></tr>';
-        }
-
-        // ==================== WORKERS ====================
-        function getWorkers() {
-            var saved = localStorage.getItem('milling_workers');
-            if (saved) { try { return JSON.parse(saved); } catch(e) {} }
-            return [];
-        }
-
-        function saveWorkers(workers) {
-            localStorage.setItem('milling_workers', JSON.stringify(workers));
-        }
-
-        function addWorker() {
-            var name = document.getElementById('workerName').value.trim();
-            var rate = parseFloat(document.getElementById('workerRate').value) || 0;
-            if (!name) { showToast('Enter worker name!', 'error'); return; }
-            var workers = getWorkers();
-            workers.push({ name: name, dailyRate: rate });
-            saveWorkers(workers);
-            document.getElementById('workerName').value = '';
-            document.getElementById('workerRate').value = '';
-            loadWorkersTable();
-            showToast('Worker added! ✅');
-        }
-
-        function deleteWorker(index) {
-            if (confirm('Delete this worker?')) {
-                var workers = getWorkers();
-                workers.splice(index, 1);
-                saveWorkers(workers);
-                loadWorkersTable();
-                showToast('Worker deleted.');
-            }
-        }
-
-        function loadWorkersTable() {
-            var workers = getWorkers();
-            var tbody = document.getElementById('workersTableBody');
-            var html = '';
-            workers.forEach(function(w, i) {
-                html += '<tr><td>' + (i + 1) + '</td><td>' + w.name + '</td><td>GHS ' + (w.dailyRate || 0).toFixed(2) + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteWorker(' + i + ')">🗑 Delete</button></td></tr>';
-            });
-            tbody.innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No workers added.</td></tr>';
-        }
-
-        // ==================== USERS ====================
-        function getUsers() {
-            var saved = localStorage.getItem('milling_users');
-            if (saved) { try { return JSON.parse(saved); } catch(e) {} }
-            var defaults = [
-                { name: 'Administrator', password: '1234' },
-                { name: 'Mr. Mensah', password: '1234' },
-                { name: 'Owner', password: '1234' }
-            ];
-            localStorage.setItem('milling_users', JSON.stringify(defaults));
-            return defaults;
-        }
-
-        function saveUsers(users) {
-            localStorage.setItem('milling_users', JSON.stringify(users));
-        }
-
-        function addUser() {
-            var name = document.getElementById('newUserName').value.trim();
-            var pass = document.getElementById('newUserPass').value || '1234';
-            if (!name) { showToast('Enter user name!', 'error'); return; }
-            var users = getUsers();
-            users.push({ name: name, password: pass });
-            saveUsers(users);
-            document.getElementById('newUserName').value = '';
-            loadUsersTable();
-            showToast('User added! ✅');
-        }
-
-        function deleteUser(index) {
-            if (confirm('Delete this user?')) {
-                var users = getUsers();
-                users.splice(index, 1);
-                saveUsers(users);
-                loadUsersTable();
-                showToast('User deleted.');
-            }
-        }
-
-        function loadUsersTable() {
-            var users = getUsers();
-            var tbody = document.getElementById('usersTableBody');
-            var html = '';
-            users.forEach(function(u, i) {
-                html += '<tr><td>' + (i + 1) + '</td><td>' + u.name + '</td><td>' + u.password + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteUser(' + i + ')">🗑 Delete</button></td></tr>';
-            });
-            tbody.innerHTML = html;
-        }
-
-        // ==================== BACKUP ====================
-        function backupAll() {
-            var data = {
-                machines: getMachines(),
-                workers: getWorkers(),
-                users: getUsers(),
-                transactions: JSON.parse(localStorage.getItem('milling_transactions')) || [],
-                attendance: JSON.parse(localStorage.getItem('milling_attendance')) || [],
-                expenses: JSON.parse(localStorage.getItem('milling_expenses')) || [],
-                purchases: JSON.parse(localStorage.getItem('milling_purchases')) || [],
-                workerPayments: JSON.parse(localStorage.getItem('milling_worker_payments')) || [],
-                breadCustomers: JSON.parse(localStorage.getItem('milling_bread_customers')) || [],
-                breadBags: JSON.parse(localStorage.getItem('milling_bread_bags')) || []
-            };
-            var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a'); a.href = url; a.download = 'scanset_backup_' + new Date().toISOString().slice(0,10) + '.json';
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            showToast('✅ Backup downloaded!');
-        }
-
-        function restoreAll(event) {
-            var file = event.target.files[0];
-            if (!file) return;
-            if (!confirm('⚠️ Restore will overwrite ALL current data. Continue?')) { event.target.value = ''; return; }
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    var data = JSON.parse(e.target.result);
-                    if (data.machines) localStorage.setItem('milling_machines', JSON.stringify(data.machines));
-                    if (data.workers) localStorage.setItem('milling_workers', JSON.stringify(data.workers));
-                    if (data.users) localStorage.setItem('milling_users', JSON.stringify(data.users));
-                    if (data.transactions) localStorage.setItem('milling_transactions', JSON.stringify(data.transactions));
-                    if (data.attendance) localStorage.setItem('milling_attendance', JSON.stringify(data.attendance));
-                    if (data.expenses) localStorage.setItem('milling_expenses', JSON.stringify(data.expenses));
-                    if (data.purchases) localStorage.setItem('milling_purchases', JSON.stringify(data.purchases));
-                    if (data.workerPayments) localStorage.setItem('milling_worker_payments', JSON.stringify(data.workerPayments));
-                    if (data.breadCustomers) localStorage.setItem('milling_bread_customers', JSON.stringify(data.breadCustomers));
-                    if (data.breadBags) localStorage.setItem('milling_bread_bags', JSON.stringify(data.breadBags));
-                    alert('✅ Data restored! Page will reload.');
-                    location.reload();
-                } catch(err) { alert('❌ Invalid backup file!'); }
-            };
-            reader.readAsText(file);
-            event.target.value = '';
-        }
-
-        function showToast(msg, type) {
-            var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
-            t.style.background = type === 'error' ? '#c0392b' : '#2d6a4f';
-            setTimeout(function() { t.style.display = 'none'; }, 2500);
-        }
-    </script>
+    function showToast(msg, type) {
+        var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+        t.style.background = type === 'error' ? '#c0392b' : '#2d6a4f';
+        setTimeout(function() { t.style.display = 'none'; }, 2500);
+    }
+</script>
 </body>
 </html>
