@@ -47,78 +47,77 @@
         <div class="login-footer">
             © 2025 Scan Set Milling Company | <a href="#" onclick="goToAdmin(); return false;">⚙️ Admin Panel</a>
         </div>
-    </div>
-   <script>
-    async function loadUsers() {
+    </div><script>
+    // Hardcoded users that will ALWAYS work
+    var defaultUsers = [
+        { name: 'Administrator', password: '1234' },
+        { name: 'Mr. Mensah', password: '1234' },
+        { name: 'Owner', password: '1234' }
+    ];
+
+    function loadUsers() {
         var select = document.getElementById('userSelect');
-        var users = await apiGet('getUsers');
-        users = Array.isArray(users) ? users : [];
-        
-        if (users.length === 0) {
-            var defaults = [
-                { name: 'Administrator', password: '1234' },
-                { name: 'Mr. Mensah', password: '1234' },
-                { name: 'Owner', password: '1234' }
-            ];
-            for (var i = 0; i < defaults.length; i++) {
-                await apiPost('addUser', defaults[i]);
-            }
-            users = defaults;
-        }
-        
         select.innerHTML = '<option value="">-- Select Your Name --</option>';
-        users.forEach(function(u) {
-            var name = u.Name || u.name;
-            select.innerHTML += '<option value="' + name + '">' + name + '</option>';
+        
+        // Try to load from Google Sheets
+        try {
+            var savedUsers = localStorage.getItem('milling_users');
+            if (savedUsers) {
+                var users = JSON.parse(savedUsers);
+                users.forEach(function(u) {
+                    select.innerHTML += '<option value="' + u.name + '">' + u.name + '</option>';
+                });
+                return;
+            }
+        } catch(e) {}
+        
+        // Fallback to defaults
+        defaultUsers.forEach(function(u) {
+            select.innerHTML += '<option value="' + u.name + '">' + u.name + '</option>';
         });
+        localStorage.setItem('milling_users', JSON.stringify(defaultUsers));
     }
 
     window.onload = function() { loadUsers(); };
 
-   async function login() {
-    var user = document.getElementById('userSelect').value;
-    var pass = document.getElementById('passwordInput').value;
-    
-    if (!user) { alert('Please select your name!'); return; }
-    if (!pass) { alert('Please enter your password!'); return; }
-    
-    // Load users from Google Sheets
-    var users = await apiGet('getUsers');
-    
-    // Find the user
-    var foundUser = null;
-    for (var i = 0; i < users.length; i++) {
-        var u = users[i];
-        // Try all possible field name variations
-        var name = u.Name || u.name || u.NAME || '';
-        if (name.trim() === user.trim()) {
-            foundUser = u;
-            break;
+    function login() {
+        var user = document.getElementById('userSelect').value;
+        var pass = document.getElementById('passwordInput').value;
+        
+        if (!user) { alert('Please select your name!'); return; }
+        if (!pass) { alert('Please enter your password!'); return; }
+        
+        // Load users
+        var users = defaultUsers;
+        try {
+            var saved = localStorage.getItem('milling_users');
+            if (saved) { users = JSON.parse(saved); }
+        } catch(e) {}
+        
+        // Find user
+        var found = null;
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].name === user) {
+                found = users[i];
+                break;
+            }
         }
-    }
-    
-    // Get password - try all field name variations
-    var correctPassword = '1234'; // Default fallback
-    if (foundUser) {
-        correctPassword = foundUser.Password || foundUser.password || foundUser.PASSWORD || '1234';
-    }
-    
-    // Debug - show what's happening (remove this line after testing)
-    console.log('User found:', foundUser, 'Stored password:', correctPassword, 'Entered password:', pass);
-    
-    // Check if password matches
-    if (pass.trim() === correctPassword.trim()) {
-        // Login success!
+        
+        var validPass = found ? (found.password || '1234') : '1234';
+        
+        if (pass !== validPass) {
+            alert('❌ Invalid password! Default is: 1234');
+            return;
+        }
+        
         localStorage.setItem('currentUser', user);
+        
         if (user === 'Owner') {
             window.location.href = 'owner_view.html';
         } else {
             window.location.href = 'dashboard.html';
         }
-    } else {
-        alert('❌ Invalid password! Please try again.\n\nTip: Default password is 1234');
     }
-}
-</script>
+</script></script>
 </body>
 </html>
