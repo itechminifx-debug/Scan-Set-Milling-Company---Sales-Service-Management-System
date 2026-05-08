@@ -4,264 +4,93 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Owner View | Scan Set Milling</title>
+    <script src="auth.js"></script>
+    <script src="api_config.js"></script>
     <style>
-        :root {
-            --primary: #1a1a2e; --accent: #e94560; --bg: #f5f5f5; --card: #fff;
-            --text: #1a1a2e; --text-light: #666; --border: #e0e0e0;
-            --success: #2d6a4f; --danger: #c0392b; --info: #1e6091; --warning: #c97a2a;
-        }
+        :root { --primary: #1a1a2e; --accent: #e94560; --bg: #f5f5f5; --card: #fff; --text: #1a1a2e; --text-light: #666; --border: #e0e0e0; --success: #2d6a4f; --danger: #c0392b; --info: #1e6091; --warning: #c97a2a; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
         body { background: var(--bg); min-height: 100vh; padding-bottom: 40px; }
-
-        .navbar {
-            background: var(--primary); color: white; padding: 16px 20px;
-            display: flex; justify-content: space-between; align-items: center;
-        }
+        .navbar { background: var(--primary); color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
         .navbar .brand { font-size: 20px; font-weight: 700; }
         .navbar .brand span { color: var(--accent); }
         .navbar a { color: white; text-decoration: none; font-size: 13px; }
-
         .container { max-width: 950px; margin: 0 auto; padding: 25px 20px; }
-
-        /* Month Selector */
-        .month-selector {
-            background: var(--card); border-radius: 14px; padding: 16px 20px;
-            margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
-        }
-        .month-selector label { font-weight: 600; font-size: 14px; }
-        .month-selector select, .month-selector input {
-            padding: 10px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;
-        }
-        .month-selector .btn-nav {
-            padding: 10px 16px; border: none; border-radius: 8px; font-weight: 600;
-            cursor: pointer; background: var(--primary); color: white;
-        }
+        .month-selector { background: var(--card); border-radius: 14px; padding: 16px 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
+        .month-selector select, .month-selector input { padding: 10px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; }
+        .month-selector .btn-nav { padding: 10px 16px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; background: var(--primary); color: white; }
         .selected-month { font-size: 16px; font-weight: 700; color: var(--primary); }
-
-        /* Monthly Summary */
-        .summary-row {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;
-            margin-bottom: 25px;
-        }
-        .summary-card {
-            background: var(--card); border-radius: 14px; padding: 20px; text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.06); border-top: 4px solid var(--primary);
-        }
+        .summary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .summary-card { background: var(--card); border-radius: 14px; padding: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.06); border-top: 4px solid var(--primary); }
         .summary-card .value { font-size: 26px; font-weight: 700; color: var(--primary); }
         .summary-card .label { font-size: 11px; color: var(--text-light); text-transform: uppercase; margin-top: 4px; }
         .summary-card.revenue { border-top-color: var(--success); }
         .summary-card.expenses { border-top-color: var(--danger); }
         .summary-card.profit { border-top-color: var(--info); }
         .summary-card.pending { border-top-color: var(--warning); }
-
-        /* Daily List */
         .section-title { font-size: 16px; font-weight: 700; color: var(--primary); margin-bottom: 15px; }
-
-        .day-card {
-            background: var(--card); border-radius: 14px; padding: 18px; margin-bottom: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04); border-left: 5px solid var(--primary);
-            transition: all 0.2s;
-        }
-        .day-card:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
-        .day-card .day-header {
-            display: flex; justify-content: space-between; align-items: center;
-            flex-wrap: wrap; gap: 10px; margin-bottom: 10px;
-        }
+        .day-card { background: var(--card); border-radius: 14px; padding: 18px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border-left: 5px solid var(--primary); }
+        .day-card .day-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
         .day-card .day-date { font-size: 16px; font-weight: 700; color: var(--primary); }
         .day-card .day-stats { display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px; }
         .day-card .day-stat { text-align: center; }
         .day-card .day-stat .val { font-weight: 700; font-size: 16px; }
         .day-card .day-stat .lbl { font-size: 10px; color: var(--text-light); text-transform: uppercase; }
-
         .day-card .txn-list { font-size: 12px; color: var(--text-light); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
-        .day-card .txn-list span { margin-right: 12px; }
-
         .no-data { text-align: center; color: #999; padding: 30px; }
-
         .alert-box { padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 8px; }
         .alert-warning { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
         .alert-success { background: #d4edda; color: #155724; border-left: 4px solid #2d6a4f; }
-
-        @media (max-width: 600px) {
-            .summary-row { grid-template-columns: 1fr 1fr; }
-            .day-card .day-stats { gap: 10px; }
-        }
+        @media (max-width: 600px) { .summary-row { grid-template-columns: 1fr 1fr; } .day-card .day-stats { gap: 10px; } }
     </style>
 </head>
 <body>
-
-    <div class="navbar">
-        <div class="brand">👑 Owner <span>View</span></div>
-        <a href="index.html">🚪 Logout</a>
-    </div>
-
+    <div class="navbar"><div class="brand">👑 Owner <span>View</span></div><a href="index.html">🚪 Logout</a></div>
     <div class="container">
-
-        <!-- Month Selector -->
         <div class="month-selector">
             <button class="btn-nav" onclick="changeMonth(-1)">◀</button>
-            <select id="monthSelect" onchange="onMonthChanged()">
-                <option value="0">January</option><option value="1">February</option><option value="2">March</option>
-                <option value="3">April</option><option value="4">May</option><option value="5">June</option>
-                <option value="6">July</option><option value="7">August</option><option value="8">September</option>
-                <option value="9">October</option><option value="10">November</option><option value="11">December</option>
-            </select>
+            <select id="monthSelect" onchange="onMonthChanged()"><option value="0">January</option><option value="1">February</option><option value="2">March</option><option value="3">April</option><option value="4">May</option><option value="5">June</option><option value="6">July</option><option value="7">August</option><option value="8">September</option><option value="9">October</option><option value="10">November</option><option value="11">December</option></select>
             <input type="number" id="yearSelect" value="2025" min="2020" max="2030" style="width:80px;" onchange="onMonthChanged()">
             <button class="btn-nav" onclick="changeMonth(1)">▶</button>
             <span class="selected-month" id="selectedMonthDisplay"></span>
         </div>
-
-        <!-- Monthly Summary -->
         <div class="summary-row">
             <div class="summary-card revenue"><div class="value" id="totalRevenue">GHS 0</div><div class="label">Monthly Revenue</div></div>
             <div class="summary-card expenses"><div class="value" id="totalExpenses">GHS 0</div><div class="label">Monthly Expenses</div></div>
             <div class="summary-card profit"><div class="value" id="netProfit">GHS 0</div><div class="label">Net Profit</div></div>
             <div class="summary-card pending"><div class="value" id="pendingAmount">GHS 0</div><div class="label">Pending Payments</div></div>
         </div>
-
-        <!-- Alerts -->
         <div id="alertsContainer" style="margin-bottom:20px;"></div>
-
-        <!-- Daily Breakdown -->
         <div class="section-title">📅 Daily Breakdown</div>
-        <div id="dailyBreakdown">
-            <div class="no-data">Loading...</div>
-        </div>
+        <div id="dailyBreakdown"><div class="no-data">Loading...</div></div>
     </div>
-
-   <script src="api_config.js"></script>
-<script>
-    var selectedMonth = new Date().getMonth();
-    var selectedYear = new Date().getFullYear();
-    var allTxns = [];
-    var allExp = [];
-    var allPur = [];
-    var allPay = [];
-
-    window.onload = async function() {
-        document.getElementById('monthSelect').value = selectedMonth;
-        document.getElementById('yearSelect').value = selectedYear;
-        await loadData();
-        updateDisplay();
-    };
-
-    async function loadData() {
-        allTxns = await apiGet('getTransactions'); allTxns = Array.isArray(allTxns) ? allTxns : [];
-        allExp = await apiGet('getExpenses'); allExp = Array.isArray(allExp) ? allExp : [];
-        allPur = await apiGet('getPurchases'); allPur = Array.isArray(allPur) ? allPur : [];
-        allPay = await apiGet('getWorkerPayments'); allPay = Array.isArray(allPay) ? allPay : [];
-    }
-
-    function updateDisplay() {
-        var monthName = getMonthName(selectedMonth);
-        document.getElementById('selectedMonthDisplay').textContent = monthName + ' ' + selectedYear;
-        loadOwnerView();
-    }
-
-    function changeMonth(dir) {
-        selectedMonth += dir;
-        if (selectedMonth < 0) { selectedMonth = 11; selectedYear--; }
-        if (selectedMonth > 11) { selectedMonth = 0; selectedYear++; }
-        document.getElementById('monthSelect').value = selectedMonth;
-        document.getElementById('yearSelect').value = selectedYear;
-        updateDisplay();
-    }
-
-    function onMonthChanged() {
-        selectedMonth = parseInt(document.getElementById('monthSelect').value);
-        selectedYear = parseInt(document.getElementById('yearSelect').value);
-        updateDisplay();
-    }
-
-    function loadOwnerView() {
-        var monthTxns = allTxns.filter(function(t) {
-            var d = new Date(t.Date || t.date);
-            return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
-        });
-        var monthExp = allExp.filter(function(e) {
-            var d = new Date(e.Date || e.date);
-            return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
-        });
-        var monthPur = allPur.filter(function(p) {
-            var d = new Date(p.Date || p.date);
-            return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
-        });
-        var monthPay = allPay.filter(function(p) {
-            var d = new Date(p.PaidDate || p.paidDate);
-            return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
-        });
-
-        var totalRev = monthTxns.reduce(function(s, t) { return s + (parseFloat(t.Total) || parseFloat(t.total) || 0); }, 0);
-        var totalExp = monthExp.reduce(function(s, e) { return s + (parseFloat(e.Amount) || parseFloat(e.amount) || 0); }, 0);
-        var totalPur = monthPur.reduce(function(s, p) { return s + (parseFloat(p.Amount) || parseFloat(p.amount) || 0); }, 0);
-        var totalPay = monthPay.reduce(function(s, p) { return s + (parseFloat(p.Amount) || parseFloat(p.amount) || 0); }, 0);
-        var profit = totalRev - totalExp - totalPur - totalPay;
-        var pending = monthTxns.filter(function(t) { return (t.Status || t.status) === 'Pending'; }).reduce(function(s, t) { return s + (parseFloat(t.Total) || parseFloat(t.total) || 0); }, 0);
-
-        document.getElementById('totalRevenue').textContent = 'GHS ' + totalRev.toFixed(2);
-        document.getElementById('totalExpenses').textContent = 'GHS ' + totalExp.toFixed(2);
-        document.getElementById('netProfit').textContent = 'GHS ' + profit.toFixed(2);
-        document.getElementById('pendingAmount').textContent = 'GHS ' + pending.toFixed(2);
-
-        // Alerts
-        var alerts = '';
-        if (pending > 0) alerts += '<div class="alert-box alert-warning">⚠️ Pending payments: <strong>GHS ' + pending.toFixed(2) + '</strong></div>';
-        if (profit < 0) alerts += '<div class="alert-box alert-warning">⚠️ Net profit is negative this month!</div>';
-        if (totalRev === 0 && alerts === '') alerts += '<div class="alert-box alert-success">📋 No transactions for this month yet.</div>';
-        if (!alerts) alerts = '<div class="alert-box alert-success">✅ All systems normal.</div>';
-        document.getElementById('alertsContainer').innerHTML = alerts;
-
-        // Daily Breakdown
-        var dailyDiv = document.getElementById('dailyBreakdown');
-        var daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-        var html = '';
-
-        for (var day = 1; day <= daysInMonth; day++) {
-            var dateStr = new Date(selectedYear, selectedMonth, day).toLocaleDateString();
-            var dayTxns = monthTxns.filter(function(t) { return (t.Date || t.date) === dateStr; });
-            var dayExp2 = monthExp.filter(function(e) { return (e.Date || e.date) === dateStr; });
-            var dayRev = dayTxns.reduce(function(s, t) { return s + (parseFloat(t.Total) || parseFloat(t.total) || 0); }, 0);
-            var dayExpTotal = dayExp2.reduce(function(s, e) { return s + (parseFloat(e.Amount) || parseFloat(e.amount) || 0); }, 0);
-
-            if (dayTxns.length > 0 || dayExp2.length > 0) {
-                html += '<div class="day-card">';
-                html += '<div class="day-header"><div class="day-date">📅 ' + new Date(selectedYear, selectedMonth, day).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + '</div></div>';
-                html += '<div class="day-stats">';
-                html += '<div class="day-stat"><div class="val" style="color:#2d6a4f;">GHS ' + dayRev.toFixed(2) + '</div><div class="lbl">Revenue</div></div>';
-                html += '<div class="day-stat"><div class="val">' + dayTxns.length + '</div><div class="lbl">Transactions</div></div>';
-                html += '<div class="day-stat"><div class="val" style="color:#c0392b;">GHS ' + dayExpTotal.toFixed(2) + '</div><div class="lbl">Expenses</div></div>';
-                if (dayRev > 0 || dayExpTotal > 0) {
-                    var dayProfit = dayRev - dayExpTotal;
-                    var profitColor = dayProfit >= 0 ? '#2d6a4f' : '#c0392b';
-                    html += '<div class="day-stat"><div class="val" style="color:' + profitColor + ';">GHS ' + dayProfit.toFixed(2) + '</div><div class="lbl">Balance</div></div>';
-                }
-                html += '</div>';
-
-                if (dayTxns.length > 0) {
-                    html += '<div class="txn-list"><strong>Transactions:</strong> ';
-                    var machineSummary = {};
-                    dayTxns.forEach(function(t) {
-                        var key = t.Machine || t.machine || 'Unknown';
-                        if (!machineSummary[key]) machineSummary[key] = 0;
-                        machineSummary[key]++;
-                    });
-                    var parts = [];
-                    Object.keys(machineSummary).forEach(function(m) { parts.push(machineSummary[m] + 'x ' + m); });
-                    html += parts.join(', ');
-                    html += '</div>';
-                }
-                html += '</div>';
-            }
+    <script>
+        var selectedMonth = new Date().getMonth(); var selectedYear = new Date().getFullYear(); var allTxns = [], allExp = [], allPur = [], allPay = [];
+        window.onload = async function() { document.getElementById('monthSelect').value = selectedMonth; document.getElementById('yearSelect').value = selectedYear; await loadData(); updateDisplay(); };
+        async function loadData() { allTxns = await apiGet('getTransactions'); allTxns = Array.isArray(allTxns) ? allTxns : []; allExp = await apiGet('getExpenses'); allExp = Array.isArray(allExp) ? allExp : []; allPur = await apiGet('getPurchases'); allPur = Array.isArray(allPur) ? allPur : []; allPay = await apiGet('getWorkerPayments'); allPay = Array.isArray(allPay) ? allPay : []; }
+        function updateDisplay() { document.getElementById('selectedMonthDisplay').textContent = getMonthName(selectedMonth) + ' ' + selectedYear; loadOwnerView(); }
+        function changeMonth(d) { selectedMonth += d; if (selectedMonth < 0) { selectedMonth = 11; selectedYear--; } if (selectedMonth > 11) { selectedMonth = 0; selectedYear++; } document.getElementById('monthSelect').value = selectedMonth; document.getElementById('yearSelect').value = selectedYear; updateDisplay(); }
+        function onMonthChanged() { selectedMonth = parseInt(document.getElementById('monthSelect').value); selectedYear = parseInt(document.getElementById('yearSelect').value); updateDisplay(); }
+        function loadOwnerView() {
+            var mt = allTxns.filter(function(t){ var d = new Date(t.Date||t.date); return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear; });
+            var me = allExp.filter(function(e){ var d = new Date(e.Date||e.date); return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear; });
+            var mp = allPur.filter(function(p){ var d = new Date(p.Date||p.date); return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear; });
+            var mpay = allPay.filter(function(p){ var d = new Date(p.PaidDate||p.paidDate); return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear; });
+            var rev = mt.reduce(function(s,t){ return s + (parseFloat(t.Total||t.total)||0); }, 0);
+            var exp = me.reduce(function(s,e){ return s + (parseFloat(e.Amount||e.amount)||0); }, 0);
+            var pur = mp.reduce(function(s,p){ return s + (parseFloat(p.Amount||p.amount)||0); }, 0);
+            var pay = mpay.reduce(function(s,p){ return s + (parseFloat(p.Amount||p.amount)||0); }, 0);
+            var profit = rev - exp - pur - pay;
+            var pending = mt.filter(function(t){ return (t.Status||t.status) === 'Pending'; }).reduce(function(s,t){ return s + (parseFloat(t.Total||t.total)||0); }, 0);
+            document.getElementById('totalRevenue').textContent = 'GHS ' + rev.toFixed(2); document.getElementById('totalExpenses').textContent = 'GHS ' + exp.toFixed(2); document.getElementById('netProfit').textContent = 'GHS ' + profit.toFixed(2); document.getElementById('pendingAmount').textContent = 'GHS ' + pending.toFixed(2);
+            var alerts = ''; if (pending > 0) alerts += '<div class="alert-box alert-warning">⚠️ Pending: <strong>GHS ' + pending.toFixed(2) + '</strong></div>'; if (profit < 0) alerts += '<div class="alert-box alert-warning">⚠️ Negative profit!</div>'; if (rev === 0) alerts += '<div class="alert-box alert-success">📋 No transactions this month.</div>'; if (!alerts) alerts = '<div class="alert-box alert-success">✅ All systems normal.</div>'; document.getElementById('alertsContainer').innerHTML = alerts;
+            var dim = new Date(selectedYear, selectedMonth + 1, 0).getDate(); var html = '';
+            for (var day = 1; day <= dim; day++) { var ds = new Date(selectedYear, selectedMonth, day).toLocaleDateString(); var dt = mt.filter(function(t){ return (t.Date||t.date) === ds; }); var de = me.filter(function(e){ return (e.Date||e.date) === ds; }); var dr = dt.reduce(function(s,t){ return s + (parseFloat(t.Total||t.total)||0); }, 0); var deTotal = de.reduce(function(s,e){ return s + (parseFloat(e.Amount||e.amount)||0); }, 0);
+                if (dt.length > 0 || de.length > 0) { html += '<div class="day-card"><div class="day-header"><div class="day-date">📅 ' + new Date(selectedYear, selectedMonth, day).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + '</div></div><div class="day-stats"><div class="day-stat"><div class="val" style="color:#2d6a4f;">GHS ' + dr.toFixed(2) + '</div><div class="lbl">Revenue</div></div><div class="day-stat"><div class="val">' + dt.length + '</div><div class="lbl">Trans</div></div><div class="day-stat"><div class="val" style="color:#c0392b;">GHS ' + deTotal.toFixed(2) + '</div><div class="lbl">Expenses</div></div>';
+                if (dr > 0 || deTotal > 0) { var dp = dr - deTotal; html += '<div class="day-stat"><div class="val" style="color:' + (dp >= 0 ? '#2d6a4f' : '#c0392b') + ';">GHS ' + dp.toFixed(2) + '</div><div class="lbl">Balance</div></div>'; } html += '</div>';
+                if (dt.length > 0) { html += '<div class="txn-list"><strong>Transactions:</strong> '; var ms = {}; dt.forEach(function(t){ var k = t.Machine||t.machine||'Unknown'; if (!ms[k]) ms[k] = 0; ms[k]++; }); var parts = []; Object.keys(ms).forEach(function(m){ parts.push(ms[m] + 'x ' + m); }); html += parts.join(', ') + '</div>'; } html += '</div>'; } }
+            document.getElementById('dailyBreakdown').innerHTML = html || '<div class="no-data">📋 No transactions for ' + getMonthName(selectedMonth) + ' ' + selectedYear + '</div>';
         }
-
-        dailyDiv.innerHTML = html || '<div class="no-data">📋 No transactions for ' + getMonthName(selectedMonth) + ' ' + selectedYear + '</div>';
-    }
-
-    function getMonthName(index) {
-        var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-        return months[index];
-    }
-</script>
+        function getMonthName(i) { return ['January','February','March','April','May','June','July','August','September','October','November','December'][i]; }
+    </script>
 </body>
 </html>
