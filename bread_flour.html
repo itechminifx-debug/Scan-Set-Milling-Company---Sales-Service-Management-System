@@ -29,7 +29,7 @@
         }
         .card h3 { color: var(--primary); font-size: 18px; margin-bottom: 16px; }
 
-        .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; }
         .form-group { margin-bottom: 12px; }
         .form-group label { display: block; font-weight: 600; color: var(--text); margin-bottom: 5px; font-size: 12px; }
         .form-group input, .form-group select {
@@ -64,9 +64,7 @@
         }
         @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        @media (max-width: 650px) {
-            .form-row { grid-template-columns: 1fr 1fr; }
-        }
+        @media (max-width: 650px) { .form-row { grid-template-columns: 1fr 1fr; } }
     </style>
 </head>
 <body>
@@ -88,11 +86,22 @@
             </div>
         </div>
 
+        <!-- Registered Customers Table -->
+        <div class="card">
+            <h3>📋 Registered Bread Makers</h3>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Registered</th><th>Bags</th><th>Action</th></tr></thead>
+                    <tbody id="customersTable"><tr><td colspan="6" style="text-align:center;color:#999;">No customers registered</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Deposit Bags -->
         <div class="card">
             <h3>📥 Deposit Flour Bags</h3>
             <div class="form-row">
-                <div class="form-group"><label>Customer</label><select id="depositCustomer"></select></div>
+                <div class="form-group"><label>Customer</label><select id="depositCustomer"><option value="">-- Select --</option></select></div>
                 <div class="form-group"><label>Bag Size (kg)</label><input type="number" id="bagSize" placeholder="e.g., 20" min="1" value="20"></div>
                 <div class="form-group"><label>Number of Bags</label><input type="number" id="bagQuantity" placeholder="e.g., 3" min="1" value="1"></div>
                 <button class="btn btn-primary" onclick="depositBags()" style="height:42px;">📥 Deposit</button>
@@ -103,8 +112,8 @@
         <div class="card">
             <h3>➖ Deduct from Bag (When Used)</h3>
             <div class="form-row">
-                <div class="form-group"><label>Customer</label><select id="deductCustomer" onchange="loadDeductBags()"></select></div>
-                <div class="form-group"><label>Select Bag</label><select id="deductBag"></select></div>
+                <div class="form-group"><label>Customer</label><select id="deductCustomer" onchange="loadDeductBags()"><option value="">-- Select --</option></select></div>
+                <div class="form-group"><label>Select Bag</label><select id="deductBag"><option value="">-- Select Bag --</option></select></div>
                 <div class="form-group"><label>Amount Used (kg)</label><input type="number" id="deductAmount" placeholder="e.g., 5" min="1" value="1"></div>
                 <button class="btn btn-warning" onclick="deductFromBag()" style="height:42px;">➖ Deduct</button>
             </div>
@@ -115,9 +124,7 @@
             <h3>📊 Customer Bag Overview</h3>
             <div class="form-group">
                 <label>Select Customer to View</label>
-                <select id="viewCustomer" onchange="loadCustomerBags()">
-                    <option value="">-- Select Customer --</option>
-                </select>
+                <select id="viewCustomer" onchange="loadCustomerBags()"><option value="">-- Select Customer --</option></select>
             </div>
             <div id="customerBagDetails" style="margin-top:10px;">
                 <p style="color:#999;text-align:center;">Select a customer to view their bags</p>
@@ -139,7 +146,6 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        // ==================== DATA HELPERS ====================
         function getCustomers() {
             var saved = localStorage.getItem('milling_bread_customers');
             return saved ? JSON.parse(saved) : [];
@@ -155,13 +161,13 @@
             localStorage.setItem('milling_bread_bags', JSON.stringify(bags));
         }
 
-        // ==================== INIT ====================
         window.onload = function() {
-            populateCustomerDropdowns();
+            populateDropdowns();
+            loadCustomersTable();
             loadAllBagsTable();
         };
 
-        function populateCustomerDropdowns() {
+        function populateDropdowns() {
             var customers = getCustomers();
             var dropdowns = ['depositCustomer', 'deductCustomer', 'viewCustomer'];
             dropdowns.forEach(function(id) {
@@ -184,8 +190,63 @@
             saveCustomers(customers);
             document.getElementById('customerName').value = '';
             document.getElementById('customerPhone').value = '';
-            populateCustomerDropdowns();
+            populateDropdowns();
+            loadCustomersTable();
             showToast('Customer registered! ✅');
+        }
+
+        // ==================== DELETE CUSTOMER ====================
+        function deleteCustomer(customerId) {
+            var customers = getCustomers();
+            var customer = customers.find(function(c) { return c.id === customerId; });
+            var customerName = customer ? customer.name : 'Unknown';
+            var bagCount = getBags().filter(function(b) { return b.customerId === customerId; }).length;
+            
+            var msg = '⚠️ Delete "' + customerName + '"?\n\n';
+            if (bagCount > 0) {
+                msg += 'This will also delete ' + bagCount + ' bag(s) belonging to this customer.\n\n';
+            }
+            msg += 'This CANNOT be undone!';
+            
+            if (!confirm(msg)) return;
+            
+            // Delete customer
+            customers = customers.filter(function(c) { return c.id !== customerId; });
+            saveCustomers(customers);
+            
+            // Delete all bags for this customer
+            var bags = getBags().filter(function(b) { return b.customerId !== customerId; });
+            saveBags(bags);
+            
+            populateDropdowns();
+            loadCustomersTable();
+            loadAllBagsTable();
+            loadCustomerBags();
+            showToast('Customer "' + customerName + '" and all bags deleted!');
+        }
+
+        function loadCustomersTable() {
+            var customers = getCustomers();
+            var bags = getBags();
+            var tbody = document.getElementById('customersTable');
+            if (customers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">No customers registered</td></tr>';
+                return;
+            }
+            var html = '';
+            customers.forEach(function(c) {
+                var customerBags = bags.filter(function(b) { return b.customerId === c.id; });
+                var activeBags = customerBags.filter(function(b) { return b.status === 'Active'; });
+                html += '<tr>';
+                html += '<td><strong>' + c.id + '</strong></td>';
+                html += '<td>' + c.name + '</td>';
+                html += '<td>' + (c.phone || 'N/A') + '</td>';
+                html += '<td>' + c.registered + '</td>';
+                html += '<td><span class="badge badge-active">' + activeBags.length + ' active</span></td>';
+                html += '<td><button class="btn btn-danger btn-sm" onclick="deleteCustomer(\'' + c.id + '\')">🗑 Delete</button></td>';
+                html += '</tr>';
+            });
+            tbody.innerHTML = html;
         }
 
         // ==================== DEPOSIT BAGS ====================
@@ -202,19 +263,15 @@
             for (var i = 0; i < quantity; i++) {
                 var bagId = 'BAG' + String(bags.length + 1).padStart(4, '0');
                 bags.push({
-                    id: bagId,
-                    customerId: customerId,
-                    customerName: customer ? customer.name : '',
-                    size: size,
-                    deposited: new Date().toLocaleDateString(),
-                    used: 0,
-                    remaining: size,
-                    status: 'Active'
+                    id: bagId, customerId: customerId, customerName: customer ? customer.name : '',
+                    size: size, deposited: new Date().toLocaleDateString(),
+                    used: 0, remaining: size, status: 'Active'
                 });
             }
 
             saveBags(bags);
             loadAllBagsTable();
+            loadCustomersTable();
             loadDeductBags();
             showToast(quantity + ' bag(s) of ' + size + 'kg deposited! ✅');
         }
@@ -225,7 +282,6 @@
             var sel = document.getElementById('deductBag');
             sel.innerHTML = '<option value="">-- Select Bag --</option>';
             if (!customerId) return;
-
             var bags = getBags().filter(function(b) { return b.customerId === customerId && b.status === 'Active'; });
             bags.forEach(function(b) {
                 sel.innerHTML += '<option value="' + b.id + '">' + b.id + ' - ' + b.size + 'kg (Remaining: ' + b.remaining + 'kg)</option>';
@@ -236,12 +292,12 @@
             var bagId = document.getElementById('deductBag').value;
             var amount = parseInt(document.getElementById('deductAmount').value) || 0;
             if (!bagId) { showToast('Select a bag!', 'error'); return; }
-            if (amount < 1) { showToast('Enter amount to deduct!', 'error'); return; }
+            if (amount < 1) { showToast('Enter amount!', 'error'); return; }
 
             var bags = getBags();
             var bag = bags.find(function(b) { return b.id === bagId; });
             if (!bag) return;
-            if (amount > bag.remaining) { showToast('Amount exceeds remaining! Remaining: ' + bag.remaining + 'kg', 'error'); return; }
+            if (amount > bag.remaining) { showToast('Amount exceeds remaining! (' + bag.remaining + 'kg left)', 'error'); return; }
 
             bag.used += amount;
             bag.remaining -= amount;
@@ -249,6 +305,7 @@
 
             saveBags(bags);
             loadAllBagsTable();
+            loadCustomersTable();
             loadDeductBags();
             loadCustomerBags();
             document.getElementById('deductAmount').value = '1';
@@ -259,7 +316,7 @@
         function loadCustomerBags() {
             var customerId = document.getElementById('viewCustomer').value;
             var div = document.getElementById('customerBagDetails');
-            if (!customerId) { div.innerHTML = '<p style="color:#999;text-align:center;">Select a customer to view their bags</p>'; return; }
+            if (!customerId) { div.innerHTML = '<p style="color:#999;text-align:center;">Select a customer</p>'; return; }
 
             var customers = getCustomers();
             var customer = customers.find(function(c) { return c.id === customerId; });
@@ -268,9 +325,9 @@
             var usedBags = bags.filter(function(b) { return b.status === 'Used'; });
 
             var html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:15px;">';
-            html += '<div style="background:#f0fdf4;padding:12px;border-radius:8px;text-align:center;"><strong style="color:#2d6a4f;">' + bags.length + '</strong><br><small>Total Bags</small></div>';
-            html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center;"><strong style="color:#1e6091;">' + activeBags.length + '</strong><br><small>Active Bags</small></div>';
-            html += '<div style="background:#fefce8;padding:12px;border-radius:8px;text-align:center;"><strong style="color:#854d0e;">' + usedBags.length + '</strong><br><small>Used Bags</small></div>';
+            html += '<div style="background:#f0fdf4;padding:12px;border-radius:8px;text-align:center;"><strong>' + bags.length + '</strong><br><small>Total Bags</small></div>';
+            html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center;"><strong>' + activeBags.length + '</strong><br><small>Active</small></div>';
+            html += '<div style="background:#fefce8;padding:12px;border-radius:8px;text-align:center;"><strong>' + usedBags.length + '</strong><br><small>Used</small></div>';
             html += '</div>';
 
             if (customer) {
@@ -282,7 +339,6 @@
                 html += '<tr><td>' + b.id + '</td><td>' + b.size + 'kg</td><td>' + b.deposited + '</td><td>' + b.used + 'kg</td><td><strong>' + b.remaining + 'kg</strong></td><td><span class="badge ' + (b.status === 'Active' ? 'badge-active' : 'badge-used') + '">' + b.status + '</span></td></tr>';
             });
             html += '</tbody></table>';
-
             div.innerHTML = html;
         }
 
@@ -290,11 +346,15 @@
         function loadAllBagsTable() {
             var bags = getBags().filter(function(b) { return b.status === 'Active'; });
             var tbody = document.getElementById('allBagsTable');
+            if (bags.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;">No active bags</td></tr>';
+                return;
+            }
             var html = '';
             bags.forEach(function(b) {
-                html += '<tr><td><strong>' + b.id + '</strong></td><td>' + b.customerName + '</td><td>' + b.size + 'kg</td><td>' + b.deposited + '</td><td>' + b.used + 'kg</td><td><strong>' + b.remaining + 'kg</strong></td><td><span class="badge badge-active">' + b.status + '</span></td><td><button class="btn btn-danger btn-sm" onclick="markBagUsed(\'' + b.id + '\')">✔️ Mark Used</button></td></tr>';
+                html += '<tr><td><strong>' + b.id + '</strong></td><td>' + b.customerName + '</td><td>' + b.size + 'kg</td><td>' + b.deposited + '</td><td>' + b.used + 'kg</td><td><strong>' + b.remaining + 'kg</strong></td><td><span class="badge badge-active">Active</span></td><td><button class="btn btn-danger btn-sm" onclick="markBagUsed(\'' + b.id + '\')">✔️ Mark Used</button></td></tr>';
             });
-            tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#999;">No active bags</td></tr>';
+            tbody.innerHTML = html;
         }
 
         function markBagUsed(bagId) {
@@ -304,6 +364,7 @@
                 if (bag) { bag.status = 'Used'; bag.remaining = 0; }
                 saveBags(bags);
                 loadAllBagsTable();
+                loadCustomersTable();
                 loadCustomerBags();
                 showToast('Bag marked as used.');
             }
