@@ -152,124 +152,103 @@
 
     <div class="toast" id="toast"></div>
 
-    <script>
-        // ==================== MACHINE DATA ====================
-        var defaultMachines = [
-            { name: 'Corn Mill - Dry', price: 2.00, unit: 'bowl(s)' },
-            { name: 'Corn Mill - Wet', price: 3.00, unit: 'bowl(s)' },
-            { name: 'Palm Nut Peeler', price: 5.00, unit: 'bucket(s)' },
-            { name: 'Palm Nut Masher', price: 5.00, unit: 'bucket(s)' },
-            { name: 'Granite Machine', price: 10.00, unit: 'load(s)' },
-            { name: 'Fufu Machine', price: 5.00, unit: 'wrap(s)' },
-            { name: 'Kokonte Machine', price: 3.00, unit: 'bowl(s)' },
-            { name: 'Pepper Machine - White', price: 2.00, unit: 'bowl(s)' },
-            { name: 'Pepper Machine - Dry', price: 2.00, unit: 'bowl(s)' },
-            { name: 'Bread Rolling Machine', price: 1.00, unit: 'piece(s)' },
-            { name: 'Cassava Milling', price: 3.00, unit: 'bowl(s)' }
-        ];
+    <script src="api_config.js"></script>
+<script>
+    var defaultMachines = [
+        { name: 'Corn Mill - Dry', price: 2.00, unit: 'bowl(s)' },
+        { name: 'Corn Mill - Wet', price: 3.00, unit: 'bowl(s)' },
+        { name: 'Palm Nut Peeler', price: 5.00, unit: 'bucket(s)' },
+        { name: 'Palm Nut Masher', price: 5.00, unit: 'bucket(s)' },
+        { name: 'Granite Machine', price: 10.00, unit: 'load(s)' },
+        { name: 'Fufu Machine', price: 5.00, unit: 'wrap(s)' },
+        { name: 'Kokonte Machine', price: 3.00, unit: 'bowl(s)' },
+        { name: 'Pepper Machine - White', price: 2.00, unit: 'bowl(s)' },
+        { name: 'Pepper Machine - Dry', price: 2.00, unit: 'bowl(s)' },
+        { name: 'Bread Rolling Machine', price: 1.00, unit: 'piece(s)' },
+        { name: 'Cassava Milling', price: 3.00, unit: 'bowl(s)' }
+    ];
 
-        function getMachines() {
-            var saved = localStorage.getItem('milling_machines');
-            if (saved) {
-                try { return JSON.parse(saved); } catch(e) {}
-            }
-            // Save defaults
-            localStorage.setItem('milling_machines', JSON.stringify(defaultMachines));
-            return defaultMachines;
+    async function loadMachines() {
+        var machines = await apiGet('getMachines');
+        if (!machines || machines.length === 0) {
+            machines = defaultMachines;
         }
+        var select = document.getElementById('machineSelect');
+        machines.forEach(function(m) {
+            var opt = document.createElement('option');
+            opt.value = m.Name || m.name;
+            opt.textContent = (m.Name || m.name) + ' (GHS ' + parseFloat(m.Price || m.price).toFixed(2) + '/' + (m.Unit || m.unit) + ')';
+            opt.dataset.price = m.Price || m.price;
+            opt.dataset.unit = m.Unit || m.unit;
+            select.appendChild(opt);
+        });
+    }
 
-        window.onload = function() {
-            var machines = getMachines();
-            var select = document.getElementById('machineSelect');
-            machines.forEach(function(m) {
-                var opt = document.createElement('option');
-                opt.value = m.name;
-                opt.textContent = m.name + ' (GHS ' + m.price.toFixed(2) + '/' + m.unit + ')';
-                opt.dataset.price = m.price;
-                opt.dataset.unit = m.unit;
-                select.appendChild(opt);
-            });
+    window.onload = function() { loadMachines(); };
+
+    function updatePrice() {
+        var opt = document.getElementById('machineSelect').selectedOptions[0];
+        if (opt && opt.dataset.price) {
+            document.getElementById('defaultPriceDisplay').textContent = 'GHS ' + parseFloat(opt.dataset.price).toFixed(2);
+            document.getElementById('unitSelect').value = opt.dataset.unit;
+            calculateTotal();
+        }
+    }
+
+    function calculateTotal() {
+        var opt = document.getElementById('machineSelect').selectedOptions[0];
+        var defaultPrice = opt ? parseFloat(opt.dataset.price) || 0 : 0;
+        var quantity = parseInt(document.getElementById('quantity').value) || 1;
+        var override = document.getElementById('priceOverride').value;
+        var unitPrice = override ? parseFloat(override) : defaultPrice;
+        var total = unitPrice * quantity;
+        document.getElementById('totalDisplay').textContent = 'GHS ' + total.toFixed(2);
+    }
+
+    function getTransactionData() {
+        var opt = document.getElementById('machineSelect').selectedOptions[0];
+        var defaultPrice = opt ? parseFloat(opt.dataset.price) || 0 : 0;
+        var quantity = parseInt(document.getElementById('quantity').value) || 1;
+        var override = document.getElementById('priceOverride').value;
+        var unitPrice = override ? parseFloat(override) : defaultPrice;
+        return {
+            id: Date.now(),
+            date: new Date().toLocaleDateString(),
+            time: new Date().toLocaleTimeString(),
+            machine: opt ? opt.value : '',
+            unit: document.getElementById('unitSelect').value,
+            quantity: quantity,
+            defaultPrice: defaultPrice,
+            unitPrice: unitPrice,
+            total: unitPrice * quantity,
+            status: document.getElementById('paymentStatus').value
         };
+    }
 
-        function updatePrice() {
-            var select = document.getElementById('machineSelect');
-            var opt = select.options[select.selectedIndex];
-            if (opt && opt.dataset.price) {
-                document.getElementById('defaultPriceDisplay').textContent = 'GHS ' + parseFloat(opt.dataset.price).toFixed(2);
-                document.getElementById('unitSelect').value = opt.dataset.unit;
-                calculateTotal();
-            }
-        }
+    async function saveTransaction() {
+        var txn = getTransactionData();
+        if (!txn.machine) { alert('Select a machine!'); return; }
+        if (txn.quantity < 1) { alert('Enter quantity!'); return; }
+        await apiPost('addTransaction', txn);
+        showToast('✅ Saved! GHS ' + txn.total.toFixed(2));
+        setTimeout(function() { window.location.href = 'dashboard.html'; }, 1000);
+    }
 
-        function calculateTotal() {
-            var select = document.getElementById('machineSelect');
-            var opt = select.options[select.selectedIndex];
-            var defaultPrice = opt ? parseFloat(opt.dataset.price) || 0 : 0;
-            var quantity = parseInt(document.getElementById('quantity').value) || 1;
-            var override = document.getElementById('priceOverride').value;
-            var unitPrice = override ? parseFloat(override) : defaultPrice;
-            var total = unitPrice * quantity;
-            document.getElementById('totalDisplay').textContent = 'GHS ' + total.toFixed(2);
-        }
+    async function saveAndNew() {
+        var txn = getTransactionData();
+        if (!txn.machine) { alert('Select a machine!'); return; }
+        if (txn.quantity < 1) { alert('Enter quantity!'); return; }
+        await apiPost('addTransaction', txn);
+        document.getElementById('quantity').value = '1';
+        document.getElementById('priceOverride').value = '';
+        document.getElementById('totalDisplay').textContent = 'GHS 0.00';
+        showToast('✅ Saved! Enter next.');
+    }
 
-        function getTransactionData() {
-            var select = document.getElementById('machineSelect');
-            var opt = select.options[select.selectedIndex];
-            var defaultPrice = opt ? parseFloat(opt.dataset.price) || 0 : 0;
-            var quantity = parseInt(document.getElementById('quantity').value) || 1;
-            var override = document.getElementById('priceOverride').value;
-            var unitPrice = override ? parseFloat(override) : defaultPrice;
-            var total = unitPrice * quantity;
-
-            return {
-                id: Date.now(),
-                date: new Date().toLocaleDateString(),
-                time: new Date().toLocaleTimeString(),
-                machine: opt ? opt.value : '',
-                unit: document.getElementById('unitSelect').value,
-                quantity: quantity,
-                defaultPrice: defaultPrice,
-                unitPrice: unitPrice,
-                total: total,
-                priceOverridden: override !== '' && parseFloat(override) !== defaultPrice,
-                status: document.getElementById('paymentStatus').value,
-                staff: document.getElementById('staffName').value
-            };
-        }
-
-        function saveTransaction() {
-            var txn = getTransactionData();
-            if (!txn.machine) { alert('Please select a machine!'); return; }
-            if (txn.quantity < 1) { alert('Please enter quantity!'); return; }
-
-            var transactions = JSON.parse(localStorage.getItem('milling_transactions')) || [];
-            transactions.push(txn);
-            localStorage.setItem('milling_transactions', JSON.stringify(transactions));
-
-            showToast('✅ Transaction saved! GHS ' + txn.total.toFixed(2));
-            setTimeout(function() { window.location.href = 'dashboard.html'; }, 1000);
-        }
-
-        function saveAndNew() {
-            var txn = getTransactionData();
-            if (!txn.machine) { alert('Please select a machine!'); return; }
-            if (txn.quantity < 1) { alert('Please enter quantity!'); return; }
-
-            var transactions = JSON.parse(localStorage.getItem('milling_transactions')) || [];
-            transactions.push(txn);
-            localStorage.setItem('milling_transactions', JSON.stringify(transactions));
-
-            document.getElementById('quantity').value = '1';
-            document.getElementById('priceOverride').value = '';
-            document.getElementById('totalDisplay').textContent = 'GHS 0.00';
-            showToast('✅ Saved! Enter next transaction.');
-        }
-
-        function showToast(msg) {
-            var t = document.getElementById('toast');
-            t.textContent = msg; t.style.display = 'block';
-            setTimeout(function() { t.style.display = 'none'; }, 2500);
-        }
-    </script>
+    function showToast(msg) {
+        var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+        setTimeout(function() { t.style.display = 'none'; }, 2500);
+    }
+</script>
 </body>
 </html>
