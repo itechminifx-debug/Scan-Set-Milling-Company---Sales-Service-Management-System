@@ -145,236 +145,254 @@
 
     <div class="toast" id="toast"></div>
 
-    <script>
-        function getCustomers() {
-            var saved = localStorage.getItem('milling_bread_customers');
-            return saved ? JSON.parse(saved) : [];
-        }
-        function saveCustomers(customers) {
-            localStorage.setItem('milling_bread_customers', JSON.stringify(customers));
-        }
-        function getBags() {
-            var saved = localStorage.getItem('milling_bread_bags');
-            return saved ? JSON.parse(saved) : [];
-        }
-        function saveBags(bags) {
-            localStorage.setItem('milling_bread_bags', JSON.stringify(bags));
-        }
+   <script src="api_config.js"></script>
+<script>
+    var allCustomers = [];
+    var allBags = [];
 
-        window.onload = function() {
-            populateDropdowns();
-            loadCustomersTable();
-            loadAllBagsTable();
+    window.onload = async function() {
+        await loadData();
+        populateDropdowns();
+        loadCustomersTable();
+        loadAllBagsTable();
+    };
+
+    async function loadData() {
+        allCustomers = await apiGet('getBreadCustomers');
+        allCustomers = Array.isArray(allCustomers) ? allCustomers : [];
+
+        allBags = await apiGet('getBreadBags');
+        allBags = Array.isArray(allBags) ? allBags : [];
+    }
+
+    function populateDropdowns() {
+        var dropdowns = ['depositCustomer', 'deductCustomer', 'viewCustomer'];
+        dropdowns.forEach(function(id) {
+            var sel = document.getElementById(id);
+            sel.innerHTML = '<option value="">-- Select Customer --</option>';
+            allCustomers.forEach(function(c) {
+                var cid = c.ID || c.id || '';
+                var cname = c.Name || c.name || '';
+                var cphone = c.Phone || c.phone || '';
+                sel.innerHTML += '<option value="' + cid + '">' + cname + ' (' + cphone + ')</option>';
+            });
+        });
+    }
+
+    // ==================== REGISTER CUSTOMER ====================
+    async function registerCustomer() {
+        var name = document.getElementById('customerName').value.trim();
+        var phone = document.getElementById('customerPhone').value.trim();
+        if (!name) { showToast('Enter customer name!', 'error'); return; }
+
+        var id = 'BC' + String(allCustomers.length + 1).padStart(3, '0');
+        var customerData = {
+            id: id,
+            name: name,
+            phone: phone,
+            registered: new Date().toLocaleDateString()
         };
 
-        function populateDropdowns() {
-            var customers = getCustomers();
-            var dropdowns = ['depositCustomer', 'deductCustomer', 'viewCustomer'];
-            dropdowns.forEach(function(id) {
-                var sel = document.getElementById(id);
-                sel.innerHTML = '<option value="">-- Select Customer --</option>';
-                customers.forEach(function(c) {
-                    sel.innerHTML += '<option value="' + c.id + '">' + c.name + ' (' + c.phone + ')</option>';
-                });
+        await apiPost('addBreadCustomer', customerData);
+        document.getElementById('customerName').value = '';
+        document.getElementById('customerPhone').value = '';
+        await loadData();
+        populateDropdowns();
+        loadCustomersTable();
+        showToast('Customer registered! ✅');
+    }
+
+    // ==================== DELETE CUSTOMER ====================
+    async function deleteCustomer(customerId) {
+        var customer = allCustomers.find(function(c) { return (c.ID || c.id) === customerId; });
+        var customerName = customer ? (customer.Name || customer.name) : 'Unknown';
+        var bagCount = allBags.filter(function(b) { return (b.CustomerID || b.customerId) === customerId; }).length;
+
+        var msg = '⚠️ Delete "' + customerName + '"?\n\n';
+        if (bagCount > 0) msg += 'This will also delete ' + bagCount + ' bag(s).\n\n';
+        msg += 'This CANNOT be undone!';
+        if (!confirm(msg)) return;
+
+        await apiDeleteById('deleteBreadCustomer', customerId);
+        await loadData();
+        populateDropdowns();
+        loadCustomersTable();
+        loadAllBagsTable();
+        loadCustomerBags();
+        showToast('Customer deleted!');
+    }
+
+    function loadCustomersTable() {
+        var tbody = document.getElementById('customersTable');
+        if (allCustomers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">No customers registered</td></tr>';
+            return;
+        }
+        var html = '';
+        allCustomers.forEach(function(c) {
+            var cid = c.ID || c.id || '';
+            var cname = c.Name || c.name || '';
+            var cphone = c.Phone || c.phone || 'N/A';
+            var creg = c.Registered || c.registered || '';
+            var activeBags = allBags.filter(function(b) {
+                return (b.CustomerID || b.customerId) === cid && (b.Status || b.status) === 'Active';
             });
+            html += '<tr><td><strong>' + cid + '</strong></td><td>' + cname + '</td><td>' + cphone + '</td><td>' + creg + '</td><td><span class="badge badge-active">' + activeBags.length + ' active</span></td><td><button class="btn btn-danger btn-sm" onclick="deleteCustomer(\'' + cid + '\')">🗑 Delete</button></td></tr>';
+        });
+        tbody.innerHTML = html;
+    }
+
+    // ==================== DEPOSIT BAGS ====================
+    async function depositBags() {
+        var customerId = document.getElementById('depositCustomer').value;
+        var size = parseInt(document.getElementById('bagSize').value) || 20;
+        var quantity = parseInt(document.getElementById('bagQuantity').value) || 1;
+        if (!customerId) { showToast('Select a customer!', 'error'); return; }
+
+        var customer = allCustomers.find(function(c) { return (c.ID || c.id) === customerId; });
+        for (var i = 0; i < quantity; i++) {
+            var bagId = 'BAG' + String(allBags.length + i + 1).padStart(4, '0');
+            var bagData = {
+                id: bagId,
+                customerId: customerId,
+                customerName: customer ? (customer.Name || customer.name) : '',
+                size: size,
+                deposited: new Date().toLocaleDateString(),
+                used: 0,
+                status: 'Active'
+            };
+            await apiPost('addBreadBag', bagData);
         }
 
-        // ==================== REGISTER CUSTOMER ====================
-        function registerCustomer() {
-            var name = document.getElementById('customerName').value.trim();
-            var phone = document.getElementById('customerPhone').value.trim();
-            if (!name) { showToast('Enter customer name!', 'error'); return; }
-            var customers = getCustomers();
-            var id = 'BC' + String(customers.length + 1).padStart(3, '0');
-            customers.push({ id: id, name: name, phone: phone, registered: new Date().toLocaleDateString() });
-            saveCustomers(customers);
-            document.getElementById('customerName').value = '';
-            document.getElementById('customerPhone').value = '';
-            populateDropdowns();
-            loadCustomersTable();
-            showToast('Customer registered! ✅');
+        await loadData();
+        loadAllBagsTable();
+        loadCustomersTable();
+        loadDeductBags();
+        showToast(quantity + ' bag(s) deposited! ✅');
+    }
+
+    // ==================== DEDUCT FROM BAG ====================
+    function loadDeductBags() {
+        var customerId = document.getElementById('deductCustomer').value;
+        var sel = document.getElementById('deductBag');
+        sel.innerHTML = '<option value="">-- Select Bag --</option>';
+        if (!customerId) return;
+        var bags = allBags.filter(function(b) {
+            return (b.CustomerID || b.customerId) === customerId && (b.Status || b.status) === 'Active';
+        });
+        bags.forEach(function(b) {
+            var bid = b.ID || b.id || '';
+            var size = b.Size || b.size || '';
+            var remaining = parseInt(b.Size || b.size) - parseInt(b.Used || b.used || 0);
+            sel.innerHTML += '<option value="' + bid + '">' + bid + ' - ' + size + 'kg (Left: ' + remaining + 'kg)</option>';
+        });
+    }
+
+    async function deductFromBag() {
+        var bagId = document.getElementById('deductBag').value;
+        var amount = parseInt(document.getElementById('deductAmount').value) || 0;
+        if (!bagId) { showToast('Select a bag!', 'error'); return; }
+        if (amount < 1) { showToast('Enter amount!', 'error'); return; }
+
+        var bag = allBags.find(function(b) { return (b.ID || b.id) === bagId; });
+        if (!bag) return;
+        var currentUsed = parseInt(bag.Used || bag.used || 0);
+        var bagSize = parseInt(bag.Size || bag.size || 0);
+        var remaining = bagSize - currentUsed;
+        if (amount > remaining) { showToast('Exceeds remaining! (' + remaining + 'kg left)', 'error'); return; }
+
+        var newUsed = currentUsed + amount;
+        var newStatus = newUsed >= bagSize ? 'Used' : 'Active';
+
+        await apiPost('updateBreadBag', {
+            id: bagId,
+            used: newUsed,
+            status: newStatus
+        });
+
+        await loadData();
+        loadAllBagsTable();
+        loadCustomersTable();
+        loadDeductBags();
+        loadCustomerBags();
+        document.getElementById('deductAmount').value = '1';
+        showToast('Deducted ' + amount + 'kg ✅');
+    }
+
+    // ==================== VIEW CUSTOMER BAGS ====================
+    function loadCustomerBags() {
+        var customerId = document.getElementById('viewCustomer').value;
+        var div = document.getElementById('customerBagDetails');
+        if (!customerId) { div.innerHTML = '<p style="color:#999;text-align:center;">Select a customer</p>'; return; }
+
+        var customer = allCustomers.find(function(c) { return (c.ID || c.id) === customerId; });
+        var bags = allBags.filter(function(b) { return (b.CustomerID || b.customerId) === customerId; });
+        var activeBags = bags.filter(function(b) { return (b.Status || b.status) === 'Active'; });
+        var usedBags = bags.filter(function(b) { return (b.Status || b.status) === 'Used'; });
+
+        var html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:15px;">';
+        html += '<div style="background:#f0fdf4;padding:12px;border-radius:8px;text-align:center;"><strong>' + bags.length + '</strong><br><small>Total</small></div>';
+        html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center;"><strong>' + activeBags.length + '</strong><br><small>Active</small></div>';
+        html += '<div style="background:#fefce8;padding:12px;border-radius:8px;text-align:center;"><strong>' + usedBags.length + '</strong><br><small>Used</small></div>';
+        html += '</div>';
+
+        if (customer) {
+            html += '<p style="margin-bottom:8px;"><strong>Customer:</strong> ' + (customer.Name || customer.name) + ' | <strong>Phone:</strong> ' + (customer.Phone || customer.phone || 'N/A') + '</p>';
         }
 
-        // ==================== DELETE CUSTOMER ====================
-        function deleteCustomer(customerId) {
-            var customers = getCustomers();
-            var customer = customers.find(function(c) { return c.id === customerId; });
-            var customerName = customer ? customer.name : 'Unknown';
-            var bagCount = getBags().filter(function(b) { return b.customerId === customerId; }).length;
-            
-            var msg = '⚠️ Delete "' + customerName + '"?\n\n';
-            if (bagCount > 0) {
-                msg += 'This will also delete ' + bagCount + ' bag(s) belonging to this customer.\n\n';
-            }
-            msg += 'This CANNOT be undone!';
-            
-            if (!confirm(msg)) return;
-            
-            // Delete customer
-            customers = customers.filter(function(c) { return c.id !== customerId; });
-            saveCustomers(customers);
-            
-            // Delete all bags for this customer
-            var bags = getBags().filter(function(b) { return b.customerId !== customerId; });
-            saveBags(bags);
-            
-            populateDropdowns();
-            loadCustomersTable();
+        html += '<table><thead><tr><th>Bag ID</th><th>Size</th><th>Deposited</th><th>Used</th><th>Left</th><th>Status</th></tr></thead><tbody>';
+        bags.forEach(function(b) {
+            var bid = b.ID || b.id || '';
+            var size = b.Size || b.size || '';
+            var deposited = b.Deposited || b.deposited || '';
+            var used = b.Used || b.used || 0;
+            var remaining = parseInt(size) - parseInt(used);
+            var status = b.Status || b.status || 'Active';
+            html += '<tr><td>' + bid + '</td><td>' + size + 'kg</td><td>' + deposited + '</td><td>' + used + 'kg</td><td><strong>' + remaining + 'kg</strong></td><td><span class="badge ' + (status === 'Active' ? 'badge-active' : 'badge-used') + '">' + status + '</span></td></tr>';
+        });
+        html += '</tbody></table>';
+        div.innerHTML = html;
+    }
+
+    // ==================== ALL BAGS TABLE ====================
+    function loadAllBagsTable() {
+        var bags = allBags.filter(function(b) { return (b.Status || b.status) === 'Active'; });
+        var tbody = document.getElementById('allBagsTable');
+        if (bags.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;">No active bags</td></tr>';
+            return;
+        }
+        var html = '';
+        bags.forEach(function(b) {
+            var bid = b.ID || b.id || '';
+            var cname = b.CustomerName || b.customerName || '';
+            var size = b.Size || b.size || '';
+            var deposited = b.Deposited || b.deposited || '';
+            var used = b.Used || b.used || 0;
+            var remaining = parseInt(size) - parseInt(used);
+            html += '<tr><td><strong>' + bid + '</strong></td><td>' + cname + '</td><td>' + size + 'kg</td><td>' + deposited + '</td><td>' + used + 'kg</td><td><strong>' + remaining + 'kg</strong></td><td><span class="badge badge-active">Active</span></td><td><button class="btn btn-danger btn-sm" onclick="markBagUsed(\'' + bid + '\')">✔️ Mark Used</button></td></tr>';
+        });
+        tbody.innerHTML = html;
+    }
+
+    async function markBagUsed(bagId) {
+        if (confirm('Mark this bag as fully used?')) {
+            var bag = allBags.find(function(b) { return (b.ID || b.id) === bagId; });
+            var bagSize = bag ? parseInt(bag.Size || bag.size || 0) : 0;
+            await apiPost('updateBreadBag', { id: bagId, used: bagSize, status: 'Used' });
+            await loadData();
             loadAllBagsTable();
+            loadCustomersTable();
             loadCustomerBags();
-            showToast('Customer "' + customerName + '" and all bags deleted!');
+            showToast('Bag marked as used.');
         }
+    }
 
-        function loadCustomersTable() {
-            var customers = getCustomers();
-            var bags = getBags();
-            var tbody = document.getElementById('customersTable');
-            if (customers.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">No customers registered</td></tr>';
-                return;
-            }
-            var html = '';
-            customers.forEach(function(c) {
-                var customerBags = bags.filter(function(b) { return b.customerId === c.id; });
-                var activeBags = customerBags.filter(function(b) { return b.status === 'Active'; });
-                html += '<tr>';
-                html += '<td><strong>' + c.id + '</strong></td>';
-                html += '<td>' + c.name + '</td>';
-                html += '<td>' + (c.phone || 'N/A') + '</td>';
-                html += '<td>' + c.registered + '</td>';
-                html += '<td><span class="badge badge-active">' + activeBags.length + ' active</span></td>';
-                html += '<td><button class="btn btn-danger btn-sm" onclick="deleteCustomer(\'' + c.id + '\')">🗑 Delete</button></td>';
-                html += '</tr>';
-            });
-            tbody.innerHTML = html;
-        }
-
-        // ==================== DEPOSIT BAGS ====================
-        function depositBags() {
-            var customerId = document.getElementById('depositCustomer').value;
-            var size = parseInt(document.getElementById('bagSize').value) || 20;
-            var quantity = parseInt(document.getElementById('bagQuantity').value) || 1;
-            if (!customerId) { showToast('Select a customer!', 'error'); return; }
-
-            var customers = getCustomers();
-            var customer = customers.find(function(c) { return c.id === customerId; });
-            var bags = getBags();
-
-            for (var i = 0; i < quantity; i++) {
-                var bagId = 'BAG' + String(bags.length + 1).padStart(4, '0');
-                bags.push({
-                    id: bagId, customerId: customerId, customerName: customer ? customer.name : '',
-                    size: size, deposited: new Date().toLocaleDateString(),
-                    used: 0, remaining: size, status: 'Active'
-                });
-            }
-
-            saveBags(bags);
-            loadAllBagsTable();
-            loadCustomersTable();
-            loadDeductBags();
-            showToast(quantity + ' bag(s) of ' + size + 'kg deposited! ✅');
-        }
-
-        // ==================== DEDUCT FROM BAG ====================
-        function loadDeductBags() {
-            var customerId = document.getElementById('deductCustomer').value;
-            var sel = document.getElementById('deductBag');
-            sel.innerHTML = '<option value="">-- Select Bag --</option>';
-            if (!customerId) return;
-            var bags = getBags().filter(function(b) { return b.customerId === customerId && b.status === 'Active'; });
-            bags.forEach(function(b) {
-                sel.innerHTML += '<option value="' + b.id + '">' + b.id + ' - ' + b.size + 'kg (Remaining: ' + b.remaining + 'kg)</option>';
-            });
-        }
-
-        function deductFromBag() {
-            var bagId = document.getElementById('deductBag').value;
-            var amount = parseInt(document.getElementById('deductAmount').value) || 0;
-            if (!bagId) { showToast('Select a bag!', 'error'); return; }
-            if (amount < 1) { showToast('Enter amount!', 'error'); return; }
-
-            var bags = getBags();
-            var bag = bags.find(function(b) { return b.id === bagId; });
-            if (!bag) return;
-            if (amount > bag.remaining) { showToast('Amount exceeds remaining! (' + bag.remaining + 'kg left)', 'error'); return; }
-
-            bag.used += amount;
-            bag.remaining -= amount;
-            if (bag.remaining <= 0) { bag.status = 'Used'; bag.remaining = 0; }
-
-            saveBags(bags);
-            loadAllBagsTable();
-            loadCustomersTable();
-            loadDeductBags();
-            loadCustomerBags();
-            document.getElementById('deductAmount').value = '1';
-            showToast('Deducted ' + amount + 'kg from ' + bagId + ' ✅');
-        }
-
-        // ==================== VIEW CUSTOMER BAGS ====================
-        function loadCustomerBags() {
-            var customerId = document.getElementById('viewCustomer').value;
-            var div = document.getElementById('customerBagDetails');
-            if (!customerId) { div.innerHTML = '<p style="color:#999;text-align:center;">Select a customer</p>'; return; }
-
-            var customers = getCustomers();
-            var customer = customers.find(function(c) { return c.id === customerId; });
-            var bags = getBags().filter(function(b) { return b.customerId === customerId; });
-            var activeBags = bags.filter(function(b) { return b.status === 'Active'; });
-            var usedBags = bags.filter(function(b) { return b.status === 'Used'; });
-
-            var html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:15px;">';
-            html += '<div style="background:#f0fdf4;padding:12px;border-radius:8px;text-align:center;"><strong>' + bags.length + '</strong><br><small>Total Bags</small></div>';
-            html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center;"><strong>' + activeBags.length + '</strong><br><small>Active</small></div>';
-            html += '<div style="background:#fefce8;padding:12px;border-radius:8px;text-align:center;"><strong>' + usedBags.length + '</strong><br><small>Used</small></div>';
-            html += '</div>';
-
-            if (customer) {
-                html += '<p style="margin-bottom:8px;"><strong>Customer:</strong> ' + customer.name + ' | <strong>Phone:</strong> ' + (customer.phone || 'N/A') + '</p>';
-            }
-
-            html += '<table><thead><tr><th>Bag ID</th><th>Size</th><th>Deposited</th><th>Used</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
-            bags.forEach(function(b) {
-                html += '<tr><td>' + b.id + '</td><td>' + b.size + 'kg</td><td>' + b.deposited + '</td><td>' + b.used + 'kg</td><td><strong>' + b.remaining + 'kg</strong></td><td><span class="badge ' + (b.status === 'Active' ? 'badge-active' : 'badge-used') + '">' + b.status + '</span></td></tr>';
-            });
-            html += '</tbody></table>';
-            div.innerHTML = html;
-        }
-
-        // ==================== ALL BAGS TABLE ====================
-        function loadAllBagsTable() {
-            var bags = getBags().filter(function(b) { return b.status === 'Active'; });
-            var tbody = document.getElementById('allBagsTable');
-            if (bags.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;">No active bags</td></tr>';
-                return;
-            }
-            var html = '';
-            bags.forEach(function(b) {
-                html += '<tr><td><strong>' + b.id + '</strong></td><td>' + b.customerName + '</td><td>' + b.size + 'kg</td><td>' + b.deposited + '</td><td>' + b.used + 'kg</td><td><strong>' + b.remaining + 'kg</strong></td><td><span class="badge badge-active">Active</span></td><td><button class="btn btn-danger btn-sm" onclick="markBagUsed(\'' + b.id + '\')">✔️ Mark Used</button></td></tr>';
-            });
-            tbody.innerHTML = html;
-        }
-
-        function markBagUsed(bagId) {
-            if (confirm('Mark this bag as fully used?')) {
-                var bags = getBags();
-                var bag = bags.find(function(b) { return b.id === bagId; });
-                if (bag) { bag.status = 'Used'; bag.remaining = 0; }
-                saveBags(bags);
-                loadAllBagsTable();
-                loadCustomersTable();
-                loadCustomerBags();
-                showToast('Bag marked as used.');
-            }
-        }
-
-        function showToast(msg, type) {
-            var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
-            t.style.background = type === 'error' ? '#c0392b' : '#2d6a4f';
-            setTimeout(function() { t.style.display = 'none'; }, 2500);
-        }
-    </script>
+    function showToast(msg, type) {
+        var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+        t.style.background = type === 'error' ? '#c0392b' : '#2d6a4f';
+        setTimeout(function() { t.style.display = 'none'; }, 2500);
+    }
+</script>
 </body>
 </html>
