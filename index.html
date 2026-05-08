@@ -48,31 +48,67 @@
             © 2025 Scan Set Milling Company | <a href="#" onclick="goToAdmin(); return false;">⚙️ Admin Panel</a>
         </div>
     </div>
-    <script>
-        async function loadUsers() {
-            var select = document.getElementById('userSelect');
-            var users = await apiGet('getUsers');
-            users = Array.isArray(users) ? users : [];
-            if (users.length === 0) {
-                users = [{ Name: 'Administrator', Password: '1234' }, { Name: 'Mr. Mensah', Password: '1234' }, { Name: 'Owner', Password: '1234' }];
-                for (var i = 0; i < users.length; i++) { await apiPost('addUser', { name: users[i].Name, password: users[i].Password }); }
+   <script>
+    async function loadUsers() {
+        var select = document.getElementById('userSelect');
+        var users = await apiGet('getUsers');
+        users = Array.isArray(users) ? users : [];
+        
+        if (users.length === 0) {
+            var defaults = [
+                { name: 'Administrator', password: '1234' },
+                { name: 'Mr. Mensah', password: '1234' },
+                { name: 'Owner', password: '1234' }
+            ];
+            for (var i = 0; i < defaults.length; i++) {
+                await apiPost('addUser', defaults[i]);
             }
-            select.innerHTML = '<option value="">-- Select Your Name --</option>';
-            users.forEach(function(u) { select.innerHTML += '<option value="' + (u.Name || u.name) + '">' + (u.Name || u.name) + '</option>'; });
+            users = defaults;
         }
-        window.onload = function() { loadUsers(); };
-        async function login() {
-            var user = document.getElementById('userSelect').value;
-            var pass = document.getElementById('passwordInput').value;
-            if (!user) { alert('Please select your name!'); return; }
-            var users = await apiGet('getUsers'); users = Array.isArray(users) ? users : [];
-            var found = users.find(function(u) { return (u.Name || u.name) === user; });
-            var validPass = found ? (found.Password || found.password || '1234') : '1234';
-            if (pass !== validPass) { alert('Invalid password!'); return; }
-            localStorage.setItem('currentUser', user);
-            if (user === 'Owner') { window.location.href = 'owner_view.html'; }
-            else { window.location.href = 'dashboard.html'; }
+        
+        select.innerHTML = '<option value="">-- Select Your Name --</option>';
+        users.forEach(function(u) {
+            var name = u.Name || u.name;
+            select.innerHTML += '<option value="' + name + '">' + name + '</option>';
+        });
+    }
+
+    window.onload = function() { loadUsers(); };
+
+    async function login() {
+        var user = document.getElementById('userSelect').value;
+        var pass = document.getElementById('passwordInput').value;
+        
+        if (!user) { alert('Please select your name!'); return; }
+        if (!pass) { alert('Please enter your password!'); return; }
+        
+        var users = await apiGet('getUsers');
+        users = Array.isArray(users) ? users : [];
+        
+        var foundUser = null;
+        for (var i = 0; i < users.length; i++) {
+            var userName = users[i].Name || users[i].name || '';
+            if (userName === user) {
+                foundUser = users[i];
+                break;
+            }
         }
-    </script>
+        
+        var storedPassword = foundUser ? (foundUser.Password || foundUser.password || '1234') : '1234';
+        
+        if (pass !== storedPassword) {
+            alert('❌ Invalid password! Please try again.');
+            return;
+        }
+        
+        localStorage.setItem('currentUser', user);
+        
+        if (user === 'Owner') {
+            window.location.href = 'owner_view.html';
+        } else {
+            window.location.href = 'dashboard.html';
+        }
+    }
+</script>
 </body>
 </html>
