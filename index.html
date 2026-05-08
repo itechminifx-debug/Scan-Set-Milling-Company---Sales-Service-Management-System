@@ -75,7 +75,7 @@
 
     window.onload = function() { loadUsers(); };
 
-    async function login() {
+   async function login() {
     var user = document.getElementById('userSelect').value;
     var pass = document.getElementById('passwordInput').value;
     
@@ -85,71 +85,30 @@
     // Load users from Google Sheets
     var users = await apiGet('getUsers');
     
-    // DEBUG: Show what we got from Google Sheets
-    var debugMsg = 'DEBUG INFO:\n\n';
-    debugMsg += 'Attempting login:\n';
-    debugMsg += 'Username: "' + user + '"\n';
-    debugMsg += 'Password: "' + pass + '"\n\n';
-    debugMsg += 'Users from Google Sheets:\n';
-    
-    if (!users || users.length === 0) {
-        debugMsg += 'NO USERS FOUND in Google Sheets!\n';
-        debugMsg += 'Will use default password: 1234\n';
-        alert(debugMsg);
-        
-        // Allow login with default password
-        if (pass === '1234') {
-            localStorage.setItem('currentUser', user);
-            if (user === 'Owner') {
-                window.location.href = 'owner_view.html';
-            } else {
-                window.location.href = 'dashboard.html';
-            }
-        } else {
-            alert('❌ Invalid password! Default password is: 1234');
-        }
-        return;
-    }
-    
-    // Show each user found
+    // Find the user
     var foundUser = null;
     for (var i = 0; i < users.length; i++) {
-        var uName = users[i].Name || users[i].name || 'NO NAME';
-        var uPass = users[i].Password || users[i].password || 'NO PASSWORD';
-        debugMsg += (i+1) + '. Name: "' + uName + '" | Password: "' + uPass + '"\n';
-        
-        if (uName === user) {
-            foundUser = users[i];
-            debugMsg += '   ^^^ MATCH FOUND! ^^^\n';
+        var u = users[i];
+        // Try all possible field name variations
+        var name = u.Name || u.name || u.NAME || '';
+        if (name.trim() === user.trim()) {
+            foundUser = u;
+            break;
         }
     }
     
-    if (!foundUser) {
-        debugMsg += '\nUser "' + user + '" NOT FOUND in list!\n';
-        debugMsg += 'Will use default password: 1234\n';
-        alert(debugMsg);
-        
-        if (pass === '1234') {
-            localStorage.setItem('currentUser', user);
-            if (user === 'Owner') {
-                window.location.href = 'owner_view.html';
-            } else {
-                window.location.href = 'dashboard.html';
-            }
-        } else {
-            alert('❌ Invalid password! Default password is: 1234');
-        }
-        return;
+    // Get password - try all field name variations
+    var correctPassword = '1234'; // Default fallback
+    if (foundUser) {
+        correctPassword = foundUser.Password || foundUser.password || foundUser.PASSWORD || '1234';
     }
     
-    var storedPassword = foundUser.Password || foundUser.password || '1234';
-    debugMsg += '\nStored password: "' + storedPassword + '"\n';
-    debugMsg += 'Entered password: "' + pass + '"\n';
-    debugMsg += 'Match: ' + (pass === storedPassword ? 'YES ✅' : 'NO ❌') + '\n';
+    // Debug - show what's happening (remove this line after testing)
+    console.log('User found:', foundUser, 'Stored password:', correctPassword, 'Entered password:', pass);
     
-    alert(debugMsg);
-    
-    if (pass === storedPassword) {
+    // Check if password matches
+    if (pass.trim() === correctPassword.trim()) {
+        // Login success!
         localStorage.setItem('currentUser', user);
         if (user === 'Owner') {
             window.location.href = 'owner_view.html';
@@ -157,7 +116,7 @@
             window.location.href = 'dashboard.html';
         }
     } else {
-        alert('❌ Invalid password! Expected: ' + storedPassword);
+        alert('❌ Invalid password! Please try again.\n\nTip: Default password is 1234');
     }
 }
 </script>
