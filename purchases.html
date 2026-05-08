@@ -100,63 +100,71 @@
     </div>
 
     <div class="toast" id="toast"></div>
+<script src="api_config.js"></script>
+<script>
+    var allPurchases = [];
 
-    <script>
-        function getPurchases() {
-            var saved = localStorage.getItem('milling_purchases');
-            return saved ? JSON.parse(saved) : [];
+    window.onload = async function() { await loadPurchases(); };
+
+    async function loadPurchases() {
+        allPurchases = await apiGet('getPurchases');
+        allPurchases = Array.isArray(allPurchases) ? allPurchases : [];
+        allPurchases.sort(function(a, b) { return new Date(b.Date || b.date) - new Date(a.Date || a.date); });
+
+        var now = new Date();
+        var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString();
+        var monthPurchases = allPurchases.filter(function(p) {
+            return new Date(p.Date || p.date) >= new Date(monthStart);
+        });
+        var monthTotal = monthPurchases.reduce(function(s, p) { return s + (parseFloat(p.Amount) || parseFloat(p.amount) || 0); }, 0);
+        document.getElementById('purchaseMonthTotal').textContent = 'GHS ' + monthTotal.toFixed(2);
+
+        var tbody = document.getElementById('purchasesTable');
+        var html = '';
+        allPurchases.slice(0, 20).forEach(function(p, i) {
+            var date = p.Date || p.date || '';
+            var item = p.Item || p.item || '';
+            var purpose = p.Purpose || p.purpose || '';
+            var amt = parseFloat(p.Amount || p.amount || 0).toFixed(2);
+            html += '<tr><td>' + date + '</td><td>' + item + '</td><td>' + purpose + '</td><td><strong>GHS ' + amt + '</strong></td><td><button class="btn btn-danger" onclick="deletePurchase(' + i + ')">🗑</button></td></tr>';
+        });
+        tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#999;">No purchases recorded</td></tr>';
+    }
+
+    async function addPurchase() {
+        var item = document.getElementById('purchaseItem').value.trim();
+        var purpose = document.getElementById('purchasePurpose').value.trim();
+        var amt = parseFloat(document.getElementById('purchaseAmount').value) || 0;
+        if (!item || !amt) { showToast('Fill all fields!', 'error'); return; }
+
+        var purchaseData = {
+            date: new Date().toLocaleDateString(),
+            item: item,
+            purpose: purpose,
+            amount: amt
+        };
+
+        await apiPost('addPurchase', purchaseData);
+        document.getElementById('purchaseItem').value = '';
+        document.getElementById('purchasePurpose').value = '';
+        document.getElementById('purchaseAmount').value = '';
+        await loadPurchases();
+        showToast('Purchase recorded! 📦');
+    }
+
+    async function deletePurchase(index) {
+        if (confirm('Delete this purchase?')) {
+            await apiDeleteByDate('deletePurchasesByDate', allPurchases[index].Date || allPurchases[index].date);
+            await loadPurchases();
+            showToast('Purchase deleted.');
         }
-        function savePurchases(data) { localStorage.setItem('milling_purchases', JSON.stringify(data)); }
+    }
 
-        window.onload = function() { loadPurchases(); };
-
-        function addPurchase() {
-            var item = document.getElementById('purchaseItem').value.trim();
-            var purpose = document.getElementById('purchasePurpose').value.trim();
-            var amt = parseFloat(document.getElementById('purchaseAmount').value) || 0;
-            if (!item || !amt) { showToast('Fill all fields!', 'error'); return; }
-            var purchases = getPurchases();
-            purchases.push({ date: new Date().toLocaleDateString(), item: item, purpose: purpose, amount: amt });
-            savePurchases(purchases);
-            document.getElementById('purchaseItem').value = '';
-            document.getElementById('purchasePurpose').value = '';
-            document.getElementById('purchaseAmount').value = '';
-            loadPurchases();
-            showToast('Purchase recorded! 📦');
-        }
-
-        function deletePurchase(index) {
-            if (confirm('Delete this purchase?')) {
-                var purchases = getPurchases();
-                purchases.splice(index, 1);
-                savePurchases(purchases);
-                loadPurchases();
-                showToast('Purchase deleted.');
-            }
-        }
-
-        function loadPurchases() {
-            var purchases = getPurchases();
-            purchases.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
-
-            var now = new Date();
-            var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString();
-            var monthTotal = purchases.filter(function(p) { return new Date(p.date) >= new Date(monthStart); }).reduce(function(s, p) { return s + p.amount; }, 0);
-            document.getElementById('purchaseMonthTotal').textContent = 'GHS ' + monthTotal.toFixed(2);
-
-            var tbody = document.getElementById('purchasesTable');
-            var html = '';
-            purchases.slice(0, 20).forEach(function(p, i) {
-                html += '<tr><td>' + p.date + '</td><td>' + p.item + '</td><td>' + p.purpose + '</td><td><strong>GHS ' + p.amount.toFixed(2) + '</strong></td><td><button class="btn btn-danger" onclick="deletePurchase(' + i + ')">🗑</button></td></tr>';
-            });
-            tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#999;">No purchases recorded</td></tr>';
-        }
-
-        function showToast(msg, type) {
-            var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
-            t.style.background = type === 'error' ? '#c0392b' : '#2d6a4f';
-            setTimeout(function() { t.style.display = 'none'; }, 2500);
-        }
-    </script>
+    function showToast(msg, type) {
+        var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+        t.style.background = type === 'error' ? '#c0392b' : '#2d6a4f';
+        setTimeout(function() { t.style.display = 'none'; }, 2500);
+    }
+</script>
 </body>
 </html>
