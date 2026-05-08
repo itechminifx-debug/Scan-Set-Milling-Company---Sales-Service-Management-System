@@ -124,162 +124,167 @@
 
     <div class="toast" id="toast"></div>
 
-    <script>
-        var today = new Date().toLocaleDateString();
-        var attendance = {};
+    <script src="api_config.js"></script>
+<script>
+    var today = new Date().toLocaleDateString();
+    var attendance = {};
+    var allWorkers = [];
 
-        function getWorkers() {
-            var saved = localStorage.getItem('milling_workers');
-            return saved ? JSON.parse(saved) : [];
-        }
+    window.onload = async function() {
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        await loadData();
+    };
 
-        function getAttendanceData() {
-            var saved = localStorage.getItem('milling_attendance');
-            return saved ? JSON.parse(saved) : [];
-        }
+    async function loadData() {
+        // Load workers from Google Sheets
+        allWorkers = await apiGet('getWorkers');
+        allWorkers = Array.isArray(allWorkers) ? allWorkers : [];
 
-        function saveAttendanceData(data) {
-            localStorage.setItem('milling_attendance', JSON.stringify(data));
-        }
+        // Load today's attendance
+        var attData = await apiGet('getAttendance');
+        attData = Array.isArray(attData) ? attData : [];
+        var todayRecords = attData.filter(function(a) { return (a.Date || a.date) === today; });
 
-        window.onload = function() {
-            document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            loadTodayAttendance();
-            loadRecentRecords();
-        };
-
-        function loadTodayAttendance() {
-            var workers = getWorkers();
-            var attData = getAttendanceData();
-            var todayRecords = attData.filter(function(a) { return a.date === today; });
-
-            attendance = {};
-            todayRecords.forEach(function(r) { attendance[r.workerName] = r.present; });
-
-            var list = document.getElementById('attendanceList');
-            if (workers.length === 0) {
-                list.innerHTML = '<p style="color:#999;text-align:center;">No workers added. Go to <a href="admin.html">Admin Panel</a> to add workers.</p>';
-                updateCounts();
-                return;
-            }
-
-            var html = '';
-            workers.forEach(function(w) {
-                var isMarked = attendance.hasOwnProperty(w.name);
-                var isPresent = isMarked ? attendance[w.name] : null;
-                var rowClass = '';
-                var statusHTML = '';
-
-                if (isMarked) {
-                    rowClass = isPresent ? 'marked-present' : 'marked-absent';
-                    statusHTML = '<span class="status-text ' + (isPresent ? 'status-present' : 'status-absent') + '">' + (isPresent ? '✅ Present' : '❌ Absent') + '</span>';
-                } else {
-                    statusHTML = '<span class="status-text status-unmarked">⬜ Not marked</span>';
-                }
-
-                html += '<div class="worker-row ' + rowClass + '" id="row_' + w.name.replace(/\s/g,'_') + '">';
-                html += '<span class="worker-name">👷 ' + w.name + '</span>';
-                html += '<div class="worker-status-group">';
-                html += statusHTML;
-                html += '<button class="mark-btn ' + (isMarked && isPresent ? 'present-active' : '') + '" data-worker="' + w.name.replace(/"/g, '&quot;') + '" data-status="present">✅ Present</button>';
-                html += '<button class="mark-btn ' + (isMarked && !isPresent ? 'absent-active' : '') + '" data-worker="' + w.name.replace(/"/g, '&quot;') + '" data-status="absent">❌ Absent</button>';
-                html += '</div></div>';
-            });
-
-            list.innerHTML = html;
-
-            // Add click events to all buttons
-            var allButtons = list.querySelectorAll('.mark-btn');
-            allButtons.forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    var workerName = this.getAttribute('data-worker');
-                    var status = this.getAttribute('data-status');
-                    markWorker(workerName, status === 'present');
-                });
-            });
-
-            updateCounts();
-        }
-
-        function markWorker(name, present) {
+        attendance = {};
+        todayRecords.forEach(function(r) {
+            var name = r.WorkerName || r.workerName;
+            var present = r.Present === 'true' || r.Present === true || r.present === true;
             attendance[name] = present;
-            var safeName = name.replace(/\s/g, '_');
-            var row = document.getElementById('row_' + safeName);
+        });
 
-            if (row) {
-                row.classList.remove('marked-present', 'marked-absent');
-                if (present) { row.classList.add('marked-present'); }
-                else { row.classList.add('marked-absent'); }
+        renderAttendanceList();
+        loadRecentRecords(attData);
+    }
 
-                var statusSpan = row.querySelector('.status-text');
-                if (statusSpan) {
-                    if (present) {
-                        statusSpan.textContent = '✅ Present';
-                        statusSpan.className = 'status-text status-present';
-                    } else {
-                        statusSpan.textContent = '❌ Absent';
-                        statusSpan.className = 'status-text status-absent';
-                    }
-                }
+    function renderAttendanceList() {
+        var list = document.getElementById('attendanceList');
+        if (allWorkers.length === 0) {
+            list.innerHTML = '<p style="color:#999;text-align:center;">No workers added. Go to <a href="#" onclick="goToAdmin(); return false;">Admin Panel</a> to add workers.</p>';
+            updateCounts();
+            return;
+        }
 
-                var buttons = row.querySelectorAll('.mark-btn');
-                if (buttons.length >= 2) {
-                    buttons[0].classList.remove('present-active');
-                    buttons[1].classList.remove('absent-active');
-                    if (present) { buttons[0].classList.add('present-active'); }
-                    else { buttons[1].classList.add('absent-active'); }
+        var html = '';
+        allWorkers.forEach(function(w) {
+            var workerName = w.Name || w.name;
+            var isMarked = attendance.hasOwnProperty(workerName);
+            var isPresent = isMarked ? attendance[workerName] : null;
+            var rowClass = '';
+            var statusHTML = '';
+
+            if (isMarked) {
+                rowClass = isPresent ? 'marked-present' : 'marked-absent';
+                statusHTML = '<span class="status-text ' + (isPresent ? 'status-present' : 'status-absent') + '">' + (isPresent ? '✅ Present' : '❌ Absent') + '</span>';
+            } else {
+                statusHTML = '<span class="status-text status-unmarked">⬜ Not marked</span>';
+            }
+
+            var safeName = workerName.replace(/\s/g, '_').replace(/"/g, '&quot;');
+            html += '<div class="worker-row ' + rowClass + '" id="row_' + safeName + '">';
+            html += '<span class="worker-name">👷 ' + workerName + '</span>';
+            html += '<div class="worker-status-group">';
+            html += statusHTML;
+            html += '<button class="mark-btn ' + (isMarked && isPresent ? 'present-active' : '') + '" data-worker="' + workerName.replace(/"/g, '&quot;') + '" data-status="present">✅ Present</button>';
+            html += '<button class="mark-btn ' + (isMarked && !isPresent ? 'absent-active' : '') + '" data-worker="' + workerName.replace(/"/g, '&quot;') + '" data-status="absent">❌ Absent</button>';
+            html += '</div></div>';
+        });
+
+        list.innerHTML = html;
+
+        // Add click events
+        var allButtons = list.querySelectorAll('.mark-btn');
+        allButtons.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var workerName = this.getAttribute('data-worker');
+                var status = this.getAttribute('data-status');
+                markWorker(workerName, status === 'present');
+            });
+        });
+
+        updateCounts();
+    }
+
+    function markWorker(name, present) {
+        attendance[name] = present;
+        var safeName = name.replace(/\s/g, '_');
+        var row = document.getElementById('row_' + safeName);
+
+        if (row) {
+            row.classList.remove('marked-present', 'marked-absent');
+            if (present) { row.classList.add('marked-present'); }
+            else { row.classList.add('marked-absent'); }
+
+            var statusSpan = row.querySelector('.status-text');
+            if (statusSpan) {
+                if (present) {
+                    statusSpan.textContent = '✅ Present';
+                    statusSpan.className = 'status-text status-present';
+                } else {
+                    statusSpan.textContent = '❌ Absent';
+                    statusSpan.className = 'status-text status-absent';
                 }
             }
 
-            updateCounts();
+            var buttons = row.querySelectorAll('.mark-btn');
+            if (buttons.length >= 2) {
+                buttons[0].classList.remove('present-active');
+                buttons[1].classList.remove('absent-active');
+                if (present) { buttons[0].classList.add('present-active'); }
+                else { buttons[1].classList.add('absent-active'); }
+            }
         }
 
-        function updateCounts() {
-            var workers = getWorkers();
-            var present = 0, absent = 0, unmarked = 0;
-            workers.forEach(function(w) {
-                if (attendance.hasOwnProperty(w.name)) {
-                    if (attendance[w.name]) present++; else absent++;
-                } else { unmarked++; }
-            });
-            document.getElementById('totalWorkers').textContent = workers.length;
-            document.getElementById('countPresent').textContent = present;
-            document.getElementById('countAbsent').textContent = absent;
-            document.getElementById('countUnmarked').textContent = unmarked;
-        }
+        updateCounts();
+    }
 
-        function saveAttendance() {
-            var workers = getWorkers();
-            var attData = getAttendanceData();
-            attData = attData.filter(function(a) { return a.date !== today; });
-            var savedCount = 0;
-            workers.forEach(function(w) {
-                if (attendance.hasOwnProperty(w.name)) {
-                    attData.push({ workerName: w.name, date: today, present: attendance[w.name] });
-                    savedCount++;
-                }
-            });
-            saveAttendanceData(attData);
-            loadRecentRecords();
-            showToast('✅ Attendance saved! ' + savedCount + ' worker(s) recorded.');
-        }
+    function updateCounts() {
+        var present = 0, absent = 0, unmarked = 0;
+        allWorkers.forEach(function(w) {
+            var name = w.Name || w.name;
+            if (attendance.hasOwnProperty(name)) {
+                if (attendance[name]) present++; else absent++;
+            } else { unmarked++; }
+        });
+        document.getElementById('totalWorkers').textContent = allWorkers.length;
+        document.getElementById('countPresent').textContent = present;
+        document.getElementById('countAbsent').textContent = absent;
+        document.getElementById('countUnmarked').textContent = unmarked;
+    }
 
-        function loadRecentRecords() {
-            var attData = getAttendanceData();
-            attData.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
-            var recent = attData.slice(0, 20);
-            var tbody = document.getElementById('recentRecords');
-            var html = '';
-            recent.forEach(function(r) {
-                html += '<tr><td style="padding:6px 8px;">' + r.date + '</td><td style="padding:6px 8px;">' + r.workerName + '</td><td style="padding:6px 8px;">' + (r.present ? '✅ Present' : '❌ Absent') + '</td></tr>';
-            });
-            tbody.innerHTML = html || '<tr><td colspan="3" style="text-align:center;color:#999;padding:15px;">No records yet</td></tr>';
-        }
+    async function saveAttendance() {
+        var records = [];
+        allWorkers.forEach(function(w) {
+            var name = w.Name || w.name;
+            if (attendance.hasOwnProperty(name)) {
+                records.push({ workerName: name, date: today, present: attendance[name] });
+            }
+        });
 
-        function showToast(msg) {
-            var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
-            setTimeout(function() { t.style.display = 'none'; }, 2500);
-        }
-    </script>
+        await apiPost('saveAttendance', records);
+        var attData = await apiGet('getAttendance');
+        attData = Array.isArray(attData) ? attData : [];
+        loadRecentRecords(attData);
+        showToast('✅ Attendance saved! ' + records.length + ' worker(s) recorded.');
+    }
+
+    function loadRecentRecords(attData) {
+        attData.sort(function(a, b) { return new Date(b.Date || b.date) - new Date(a.Date || a.date); });
+        var recent = attData.slice(0, 20);
+        var tbody = document.getElementById('recentRecords');
+        var html = '';
+        recent.forEach(function(r) {
+            var date = r.Date || r.date || '';
+            var name = r.WorkerName || r.workerName || '';
+            var present = r.Present === 'true' || r.Present === true || r.present === true;
+            html += '<tr><td style="padding:6px 8px;">' + date + '</td><td style="padding:6px 8px;">' + name + '</td><td style="padding:6px 8px;">' + (present ? '✅ Present' : '❌ Absent') + '</td></tr>';
+        });
+        tbody.innerHTML = html || '<tr><td colspan="3" style="text-align:center;color:#999;padding:15px;">No records yet</td></tr>';
+    }
+
+    function showToast(msg) {
+        var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+        setTimeout(function() { t.style.display = 'none'; }, 2500);
+    }
+</script>
 </body>
 </html>
