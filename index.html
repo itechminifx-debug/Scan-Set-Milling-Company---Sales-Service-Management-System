@@ -40,84 +40,86 @@
             </div>
             <div class="form-group">
                 <label>🔑 Password</label>
-                <input type="password" id="passwordInput" placeholder="Enter password" value="1234">
+                <input type="password" id="passwordInput" placeholder="Enter password" value="">
             </div>
             <button class="btn-login" onclick="login()">🚀 Enter System</button>
         </div>
         <div class="login-footer">
             © 2025 Scan Set Milling Company | <a href="#" onclick="goToAdmin(); return false;">⚙️ Admin Panel</a>
         </div>
-    </div><script>
-    // Hardcoded users that will ALWAYS work
-    var defaultUsers = [
-        { name: 'Administrator', password: '1234' },
-        { name: 'Mr. Mensah', password: '1234' },
-        { name: 'Owner', password: '1234' }
-    ];
+    </div>
 
-    function loadUsers() {
-        var select = document.getElementById('userSelect');
-        select.innerHTML = '<option value="">-- Select Your Name --</option>';
-        
-        // Try to load from Google Sheets
-        try {
-            var savedUsers = localStorage.getItem('milling_users');
-            if (savedUsers) {
-                var users = JSON.parse(savedUsers);
-                users.forEach(function(u) {
-                    select.innerHTML += '<option value="' + u.name + '">' + u.name + '</option>';
-                });
+    <script>
+        // Default users that ALWAYS work
+        var defaultUsers = [
+            { name: 'Administrator', password: '1234' },
+            { name: 'Mr. Mensah', password: '1234' },
+            { name: 'Owner', password: '1234' }
+        ];
+
+        function loadUsers() {
+            var select = document.getElementById('userSelect');
+            select.innerHTML = '<option value="">-- Select Your Name --</option>';
+            
+            // Try to load from localStorage first
+            try {
+                var savedUsers = localStorage.getItem('milling_users');
+                if (savedUsers) {
+                    var users = JSON.parse(savedUsers);
+                    users.forEach(function(u) {
+                        select.innerHTML += '<option value="' + u.name + '">' + u.name + '</option>';
+                    });
+                    return;
+                }
+            } catch(e) {}
+            
+            // Fallback to defaults and save them
+            defaultUsers.forEach(function(u) {
+                select.innerHTML += '<option value="' + u.name + '">' + u.name + '</option>';
+            });
+            localStorage.setItem('milling_users', JSON.stringify(defaultUsers));
+        }
+
+        window.onload = function() { loadUsers(); };
+
+        function login() {
+            var user = document.getElementById('userSelect').value;
+            var pass = document.getElementById('passwordInput').value;
+            
+            if (!user) { alert('Please select your name!'); return; }
+            if (!pass) { alert('Please enter your password!'); return; }
+            
+            // Load users
+            var users = defaultUsers;
+            try {
+                var saved = localStorage.getItem('milling_users');
+                if (saved) { users = JSON.parse(saved); }
+            } catch(e) {}
+            
+            // Find user
+            var found = null;
+            for (var i = 0; i < users.length; i++) {
+                if (users[i].name === user) {
+                    found = users[i];
+                    break;
+                }
+            }
+            
+            var validPass = found ? (found.password || '1234') : '1234';
+            
+            if (pass !== validPass) {
+                alert('❌ Invalid password! Default password is: 1234');
                 return;
             }
-        } catch(e) {}
-        
-        // Fallback to defaults
-        defaultUsers.forEach(function(u) {
-            select.innerHTML += '<option value="' + u.name + '">' + u.name + '</option>';
-        });
-        localStorage.setItem('milling_users', JSON.stringify(defaultUsers));
-    }
-
-    window.onload = function() { loadUsers(); };
-
-    function login() {
-        var user = document.getElementById('userSelect').value;
-        var pass = document.getElementById('passwordInput').value;
-        
-        if (!user) { alert('Please select your name!'); return; }
-        if (!pass) { alert('Please enter your password!'); return; }
-        
-        // Load users
-        var users = defaultUsers;
-        try {
-            var saved = localStorage.getItem('milling_users');
-            if (saved) { users = JSON.parse(saved); }
-        } catch(e) {}
-        
-        // Find user
-        var found = null;
-        for (var i = 0; i < users.length; i++) {
-            if (users[i].name === user) {
-                found = users[i];
-                break;
+            
+            localStorage.setItem('currentUser', user);
+            
+            if (user === 'Owner') {
+                window.location.href = 'owner_view.html';
+            } else {
+                window.location.href = 'dashboard.html';
             }
         }
-        
-        var validPass = found ? (found.password || '1234') : '1234';
-        
-        if (pass !== validPass) {
-            alert('❌ Invalid password! Default is: 1234');
-            return;
-        }
-        
-        localStorage.setItem('currentUser', user);
-        
-        if (user === 'Owner') {
-            window.location.href = 'owner_view.html';
-        } else {
-            window.location.href = 'dashboard.html';
-        }
-    }
-</script></script>
+    </script>
 </body>
 </html>
