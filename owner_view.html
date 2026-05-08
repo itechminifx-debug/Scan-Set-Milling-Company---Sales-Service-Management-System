@@ -130,138 +130,138 @@
         </div>
     </div>
 
-    <script>
-        var selectedMonth = new Date().getMonth();
-        var selectedYear = new Date().getFullYear();
+   <script src="api_config.js"></script>
+<script>
+    var selectedMonth = new Date().getMonth();
+    var selectedYear = new Date().getFullYear();
+    var allTxns = [];
+    var allExp = [];
+    var allPur = [];
+    var allPay = [];
 
-        function getTxns() { var s = localStorage.getItem('milling_transactions'); return s ? JSON.parse(s) : []; }
-        function getExp() { var s = localStorage.getItem('milling_expenses'); return s ? JSON.parse(s) : []; }
-        function getPur() { var s = localStorage.getItem('milling_purchases'); return s ? JSON.parse(s) : []; }
-        function getPay() { var s = localStorage.getItem('milling_worker_payments'); return s ? JSON.parse(s) : []; }
-        function getAtt() { var s = localStorage.getItem('milling_attendance'); return s ? JSON.parse(s) : []; }
+    window.onload = async function() {
+        document.getElementById('monthSelect').value = selectedMonth;
+        document.getElementById('yearSelect').value = selectedYear;
+        await loadData();
+        updateDisplay();
+    };
 
-        window.onload = function() {
-            document.getElementById('monthSelect').value = selectedMonth;
-            document.getElementById('yearSelect').value = selectedYear;
-            updateDisplay();
-        };
+    async function loadData() {
+        allTxns = await apiGet('getTransactions'); allTxns = Array.isArray(allTxns) ? allTxns : [];
+        allExp = await apiGet('getExpenses'); allExp = Array.isArray(allExp) ? allExp : [];
+        allPur = await apiGet('getPurchases'); allPur = Array.isArray(allPur) ? allPur : [];
+        allPay = await apiGet('getWorkerPayments'); allPay = Array.isArray(allPay) ? allPay : [];
+    }
 
-        function updateDisplay() {
-            var monthName = getMonthName(selectedMonth);
-            document.getElementById('selectedMonthDisplay').textContent = monthName + ' ' + selectedYear;
-            loadOwnerView();
-        }
+    function updateDisplay() {
+        var monthName = getMonthName(selectedMonth);
+        document.getElementById('selectedMonthDisplay').textContent = monthName + ' ' + selectedYear;
+        loadOwnerView();
+    }
 
-        function changeMonth(dir) {
-            selectedMonth += dir;
-            if (selectedMonth < 0) { selectedMonth = 11; selectedYear--; }
-            if (selectedMonth > 11) { selectedMonth = 0; selectedYear++; }
-            document.getElementById('monthSelect').value = selectedMonth;
-            document.getElementById('yearSelect').value = selectedYear;
-            updateDisplay();
-        }
+    function changeMonth(dir) {
+        selectedMonth += dir;
+        if (selectedMonth < 0) { selectedMonth = 11; selectedYear--; }
+        if (selectedMonth > 11) { selectedMonth = 0; selectedYear++; }
+        document.getElementById('monthSelect').value = selectedMonth;
+        document.getElementById('yearSelect').value = selectedYear;
+        updateDisplay();
+    }
 
-        function onMonthChanged() {
-            selectedMonth = parseInt(document.getElementById('monthSelect').value);
-            selectedYear = parseInt(document.getElementById('yearSelect').value);
-            updateDisplay();
-        }
+    function onMonthChanged() {
+        selectedMonth = parseInt(document.getElementById('monthSelect').value);
+        selectedYear = parseInt(document.getElementById('yearSelect').value);
+        updateDisplay();
+    }
 
-        function loadOwnerView() {
-            var txns = getTxns();
-            var expenses = getExp();
-            var purchases = getPur();
-            var workerPay = getPay();
+    function loadOwnerView() {
+        var monthTxns = allTxns.filter(function(t) {
+            var d = new Date(t.Date || t.date);
+            return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+        });
+        var monthExp = allExp.filter(function(e) {
+            var d = new Date(e.Date || e.date);
+            return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+        });
+        var monthPur = allPur.filter(function(p) {
+            var d = new Date(p.Date || p.date);
+            return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+        });
+        var monthPay = allPay.filter(function(p) {
+            var d = new Date(p.PaidDate || p.paidDate);
+            return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+        });
 
-            // Filter by selected month
-            var monthTxns = txns.filter(function(t) { var d = new Date(t.date); return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear; });
-            var monthExp = expenses.filter(function(e) { var d = new Date(e.date); return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear; });
-            var monthPur = purchases.filter(function(p) { var d = new Date(p.date); return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear; });
-            var monthPay = workerPay.filter(function(p) { var d = new Date(p.paidDate); return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear; });
+        var totalRev = monthTxns.reduce(function(s, t) { return s + (parseFloat(t.Total) || parseFloat(t.total) || 0); }, 0);
+        var totalExp = monthExp.reduce(function(s, e) { return s + (parseFloat(e.Amount) || parseFloat(e.amount) || 0); }, 0);
+        var totalPur = monthPur.reduce(function(s, p) { return s + (parseFloat(p.Amount) || parseFloat(p.amount) || 0); }, 0);
+        var totalPay = monthPay.reduce(function(s, p) { return s + (parseFloat(p.Amount) || parseFloat(p.amount) || 0); }, 0);
+        var profit = totalRev - totalExp - totalPur - totalPay;
+        var pending = monthTxns.filter(function(t) { return (t.Status || t.status) === 'Pending'; }).reduce(function(s, t) { return s + (parseFloat(t.Total) || parseFloat(t.total) || 0); }, 0);
 
-            // Calculate totals
-            var totalRev = monthTxns.reduce(function(s, t) { return s + t.total; }, 0);
-            var totalExp = monthExp.reduce(function(s, e) { return s + e.amount; }, 0);
-            var totalPur = monthPur.reduce(function(s, p) { return s + p.amount; }, 0);
-            var totalPay = monthPay.reduce(function(s, p) { return s + p.amount; }, 0);
-            var profit = totalRev - totalExp - totalPur - totalPay;
-            var pending = monthTxns.filter(function(t) { return t.status === 'Pending'; }).reduce(function(s, t) { return s + t.total; }, 0);
+        document.getElementById('totalRevenue').textContent = 'GHS ' + totalRev.toFixed(2);
+        document.getElementById('totalExpenses').textContent = 'GHS ' + totalExp.toFixed(2);
+        document.getElementById('netProfit').textContent = 'GHS ' + profit.toFixed(2);
+        document.getElementById('pendingAmount').textContent = 'GHS ' + pending.toFixed(2);
 
-            // Update summary
-            document.getElementById('totalRevenue').textContent = 'GHS ' + totalRev.toFixed(2);
-            document.getElementById('totalExpenses').textContent = 'GHS ' + totalExp.toFixed(2);
-            document.getElementById('netProfit').textContent = 'GHS ' + profit.toFixed(2);
-            document.getElementById('pendingAmount').textContent = 'GHS ' + pending.toFixed(2);
+        // Alerts
+        var alerts = '';
+        if (pending > 0) alerts += '<div class="alert-box alert-warning">⚠️ Pending payments: <strong>GHS ' + pending.toFixed(2) + '</strong></div>';
+        if (profit < 0) alerts += '<div class="alert-box alert-warning">⚠️ Net profit is negative this month!</div>';
+        if (totalRev === 0 && alerts === '') alerts += '<div class="alert-box alert-success">📋 No transactions for this month yet.</div>';
+        if (!alerts) alerts = '<div class="alert-box alert-success">✅ All systems normal.</div>';
+        document.getElementById('alertsContainer').innerHTML = alerts;
 
-            // Alerts
-            var alerts = '';
-            if (pending > 0) alerts += '<div class="alert-box alert-warning">⚠️ Pending payments: <strong>GHS ' + pending.toFixed(2) + '</strong></div>';
-            if (profit < 0) alerts += '<div class="alert-box alert-warning">⚠️ Net profit is negative this month!</div>';
-            if (totalRev === 0 && alerts === '') alerts += '<div class="alert-box alert-success">📋 No transactions recorded for this month yet.</div>';
-            if (!alerts) alerts = '<div class="alert-box alert-success">✅ All systems normal.</div>';
-            document.getElementById('alertsContainer').innerHTML = alerts;
+        // Daily Breakdown
+        var dailyDiv = document.getElementById('dailyBreakdown');
+        var daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+        var html = '';
 
-            // Daily Breakdown
-            var dailyDiv = document.getElementById('dailyBreakdown');
-            var daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-            var html = '';
+        for (var day = 1; day <= daysInMonth; day++) {
+            var dateStr = new Date(selectedYear, selectedMonth, day).toLocaleDateString();
+            var dayTxns = monthTxns.filter(function(t) { return (t.Date || t.date) === dateStr; });
+            var dayExp2 = monthExp.filter(function(e) { return (e.Date || e.date) === dateStr; });
+            var dayRev = dayTxns.reduce(function(s, t) { return s + (parseFloat(t.Total) || parseFloat(t.total) || 0); }, 0);
+            var dayExpTotal = dayExp2.reduce(function(s, e) { return s + (parseFloat(e.Amount) || parseFloat(e.amount) || 0); }, 0);
 
-            for (var day = 1; day <= daysInMonth; day++) {
-                var dateStr = new Date(selectedYear, selectedMonth, day).toLocaleDateString();
-                var dayTxns = monthTxns.filter(function(t) { return t.date === dateStr; });
-                var dayExp = monthExp.filter(function(e) { return e.date === dateStr; });
-                var dayRev = dayTxns.reduce(function(s, t) { return s + t.total; }, 0);
-                var dayExpTotal = dayExp.reduce(function(s, e) { return s + e.amount; }, 0);
+            if (dayTxns.length > 0 || dayExp2.length > 0) {
+                html += '<div class="day-card">';
+                html += '<div class="day-header"><div class="day-date">📅 ' + new Date(selectedYear, selectedMonth, day).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + '</div></div>';
+                html += '<div class="day-stats">';
+                html += '<div class="day-stat"><div class="val" style="color:#2d6a4f;">GHS ' + dayRev.toFixed(2) + '</div><div class="lbl">Revenue</div></div>';
+                html += '<div class="day-stat"><div class="val">' + dayTxns.length + '</div><div class="lbl">Transactions</div></div>';
+                html += '<div class="day-stat"><div class="val" style="color:#c0392b;">GHS ' + dayExpTotal.toFixed(2) + '</div><div class="lbl">Expenses</div></div>';
+                if (dayRev > 0 || dayExpTotal > 0) {
+                    var dayProfit = dayRev - dayExpTotal;
+                    var profitColor = dayProfit >= 0 ? '#2d6a4f' : '#c0392b';
+                    html += '<div class="day-stat"><div class="val" style="color:' + profitColor + ';">GHS ' + dayProfit.toFixed(2) + '</div><div class="lbl">Balance</div></div>';
+                }
+                html += '</div>';
 
-                if (dayTxns.length > 0 || dayExp.length > 0) {
-                    html += '<div class="day-card">';
-                    html += '<div class="day-header">';
-                    html += '<div class="day-date">📅 ' + new Date(selectedYear, selectedMonth, day).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + '</div>';
-                    html += '</div>';
-                    html += '<div class="day-stats">';
-                    html += '<div class="day-stat"><div class="val" style="color:#2d6a4f;">GHS ' + dayRev.toFixed(2) + '</div><div class="lbl">Revenue</div></div>';
-                    html += '<div class="day-stat"><div class="val">' + dayTxns.length + '</div><div class="lbl">Transactions</div></div>';
-                    html += '<div class="day-stat"><div class="val" style="color:#c0392b;">GHS ' + dayExpTotal.toFixed(2) + '</div><div class="lbl">Expenses</div></div>';
-                    if (dayRev > 0 || dayExpTotal > 0) {
-                        var dayProfit = dayRev - dayExpTotal;
-                        var profitColor = dayProfit >= 0 ? '#2d6a4f' : '#c0392b';
-                        html += '<div class="day-stat"><div class="val" style="color:' + profitColor + ';">GHS ' + dayProfit.toFixed(2) + '</div><div class="lbl">Balance</div></div>';
-                    }
-                    html += '</div>';
-
-                    // Transaction summary line
-                    if (dayTxns.length > 0) {
-                        html += '<div class="txn-list">';
-                        html += '<strong>Transactions:</strong> ';
-                        var machineSummary = {};
-                        dayTxns.forEach(function(t) {
-                            var key = t.machine;
-                            if (!machineSummary[key]) machineSummary[key] = 0;
-                            machineSummary[key]++;
-                        });
-                        var parts = [];
-                        Object.keys(machineSummary).forEach(function(m) {
-                            parts.push(machineSummary[m] + 'x ' + m);
-                        });
-                        html += parts.join(', ');
-                        html += '</div>';
-                    }
-
+                if (dayTxns.length > 0) {
+                    html += '<div class="txn-list"><strong>Transactions:</strong> ';
+                    var machineSummary = {};
+                    dayTxns.forEach(function(t) {
+                        var key = t.Machine || t.machine || 'Unknown';
+                        if (!machineSummary[key]) machineSummary[key] = 0;
+                        machineSummary[key]++;
+                    });
+                    var parts = [];
+                    Object.keys(machineSummary).forEach(function(m) { parts.push(machineSummary[m] + 'x ' + m); });
+                    html += parts.join(', ');
                     html += '</div>';
                 }
+                html += '</div>';
             }
-
-            if (html === '') {
-                html = '<div class="no-data">📋 No transactions recorded for ' + getMonthName(selectedMonth) + ' ' + selectedYear + '</div>';
-            }
-
-            dailyDiv.innerHTML = html;
         }
 
-        function getMonthName(index) {
-            var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-            return months[index];
-        }
-    </script>
+        dailyDiv.innerHTML = html || '<div class="no-data">📋 No transactions for ' + getMonthName(selectedMonth) + ' ' + selectedYear + '</div>';
+    }
+
+    function getMonthName(index) {
+        var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        return months[index];
+    }
+</script>
 </body>
 </html>
