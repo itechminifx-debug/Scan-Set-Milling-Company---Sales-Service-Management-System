@@ -98,17 +98,41 @@
             var ov = document.getElementById('priceOverride').value; var up = ov ? parseFloat(ov) : dp;
             return { id: Date.now(), date: new Date().toLocaleDateString(), time: new Date().toLocaleTimeString(), machine: opt ? opt.value : '', unit: document.getElementById('unitSelect').value, quantity: qty, defaultPrice: dp, unitPrice: up, total: up * qty, status: document.getElementById('paymentStatus').value };
         }
-        async function saveTransaction() {
-            var txn = getTxn(); if (!txn.machine) { alert('Select a machine!'); return; } if (txn.quantity < 1) { alert('Enter quantity!'); return; }
-            await apiPost('addTransaction', txn); showToast('✅ Saved! GHS ' + txn.total.toFixed(2));
-            setTimeout(function() { window.location.href = 'dashboard.html'; }, 1000);
-        }
-        async function saveAndNew() {
-            var txn = getTxn(); if (!txn.machine) { alert('Select a machine!'); return; } if (txn.quantity < 1) { alert('Enter quantity!'); return; }
-            await apiPost('addTransaction', txn); document.getElementById('quantity').value = '1'; document.getElementById('priceOverride').value = ''; document.getElementById('totalDisplay').textContent = 'GHS 0.00';
-            showToast('✅ Saved! Enter next.');
-        }
-        function showToast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(function() { t.style.display = 'none'; }, 2500); }
+       async function saveTransaction() {
+    var txn = getTxn();
+    if (!txn.machine) { alert('Select a machine!'); return; }
+    if (txn.quantity < 1) { alert('Enter quantity!'); return; }
+    
+    // 1. Save to localStorage FIRST (instant)
+    var txns = JSON.parse(localStorage.getItem('milling_transactions')) || [];
+    txns.push(txn);
+    localStorage.setItem('milling_transactions', JSON.stringify(txns));
+    
+    // 2. Try Google Sheets in background (don't wait for it)
+    try { await apiPost('addTransaction', txn); } catch(e) {}
+    
+    showToast('✅ Saved! GHS ' + txn.total.toFixed(2));
+    setTimeout(function() { window.location.href = 'dashboard.html'; }, 1000);
+}
+
+async function saveAndNew() {
+    var txn = getTxn();
+    if (!txn.machine) { alert('Select a machine!'); return; }
+    if (txn.quantity < 1) { alert('Enter quantity!'); return; }
+    
+    // 1. Save to localStorage FIRST (instant)
+    var txns = JSON.parse(localStorage.getItem('milling_transactions')) || [];
+    txns.push(txn);
+    localStorage.setItem('milling_transactions', JSON.stringify(txns));
+    
+    // 2. Try Google Sheets in background
+    try { await apiPost('addTransaction', txn); } catch(e) {}
+    
+    document.getElementById('quantity').value = '1';
+    document.getElementById('priceOverride').value = '';
+    document.getElementById('totalDisplay').textContent = 'GHS 0.00';
+    showToast('✅ Saved! Enter next.');
+}
     </script>
 </body>
 </html>
