@@ -105,37 +105,49 @@
         function changeDate(days) { var c = new Date(selectedDate); c.setDate(c.getDate() + days); selectedDate = c.toLocaleDateString(); updateDisplay(); }
         function onDatePicked() { var v = document.getElementById('datePicker').value; if (v) { selectedDate = new Date(v + 'T00:00:00').toLocaleDateString(); updateDisplay(); } }
         function goToToday() { selectedDate = new Date().toLocaleDateString(); updateDisplay(); }
+       
         async function loadDashboardForDate(dateStr) {
-            var txns = await apiGet('getTransactions'); txns = Array.isArray(txns) ? txns : [];
-            var dayTxns = txns.filter(function(t) { return (t.Date || t.date) === dateStr; });
-            var rev = dayTxns.reduce(function(s, t) { return s + (parseFloat(t.Total || t.total) || 0); }, 0);
-            document.getElementById('dayRevenue').textContent = 'GHS ' + rev.toLocaleString();
-            document.getElementById('dayTransactions').textContent = dayTxns.length;
-            var att = await apiGet('getAttendance'); att = Array.isArray(att) ? att : [];
-            var dayAtt = att.filter(function(a) { return (a.Date || a.date) === dateStr && (a.Present === 'true' || a.Present === true || a.present === true); });
-            document.getElementById('dayWorkers').textContent = dayAtt.length;
-            var exp = await apiGet('getExpenses'); exp = Array.isArray(exp) ? exp : [];
-            var dayExp = exp.filter(function(e) { return (e.Date || e.date) === dateStr; }).reduce(function(s, e) { return s + (parseFloat(e.Amount || e.amount) || 0); }, 0);
-            document.getElementById('dayExpenses').textContent = 'GHS ' + dayExp.toLocaleString();
-            var tbody = document.getElementById('dayTransactionsTable');
-            var recent = dayTxns.slice(-10).reverse();
-            if (recent.length > 0) {
-                var html = '';
-                recent.forEach(function(t) {
-                    html += '<tr><td>' + (t.Time || t.time || '') + '</td><td>' + (t.Machine || t.machine || '') + '</td><td>' + (t.Quantity || t.quantity || '') + '</td><td>GHS ' + parseFloat(t.UnitPrice || t.unitPrice || 0).toFixed(2) + '</td><td><strong>GHS ' + parseFloat(t.Total || t.total || 0).toFixed(2) + '</strong></td><td><span class="badge ' + ((t.Status || t.status) === 'Paid' ? 'badge-paid' : 'badge-pending') + '">' + (t.Status || t.status) + '</span></td></tr>';
-                });
-                tbody.innerHTML = html;
-            } else { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No transactions for this date</td></tr>'; }
+    // 1. Load from localStorage FIRST (instant)
+    var transactions = JSON.parse(localStorage.getItem('milling_transactions')) || [];
+    
+    // 2. Try Google Sheets in background
+    try {
+        var apiTxns = await apiGet('getTransactions');
+        if (apiTxns && apiTxns.length > 0) {
+            transactions = apiTxns;
+            // Update localStorage with API data
+            localStorage.setItem('milling_transactions', JSON.stringify(apiTxns));
         }
-        async function deleteSelectedDateData() {
-            if (!confirm('⚠️ Delete ALL data for ' + selectedDate + '?')) return;
-            if (!confirm('FINAL CONFIRMATION?')) return;
-            await apiDeleteByDate('deleteTransactionsByDate', selectedDate);
-            await apiDeleteByDate('deleteExpensesByDate', selectedDate);
-            await apiDeleteByDate('deletePurchasesByDate', selectedDate);
-            alert('✅ Deleted!'); updateDisplay();
-        }
-        function logout() { localStorage.removeItem('currentUser'); window.location.href = 'index.html'; }
+    } catch(e) {}
+    
+    var dayTxns = transactions.filter(function(t) { return (t.Date || t.date) === dateStr; });
+    var rev = dayTxns.reduce(function(s, t) { return s + (parseFloat(t.Total || t.total) || 0); }, 0);
+    
+    document.getElementById('dayRevenue').textContent = 'GHS ' + rev.toLocaleString();
+    document.getElementById('dayTransactions').textContent = dayTxns.length;
+    
+    // Display transactions
+    var tbody = document.getElementById('dayTransactionsTable');
+    var recent = dayTxns.slice(-10).reverse();
+    if (recent.length > 0) {
+        var html = '';
+        recent.forEach(function(t) {
+            html += '<tr><td>' + (t.Time || t.time || '') + '</td><td>' + (t.Machine || t.machine || '') + '</td><td>' + (t.Quantity || t.quantity || '') + '</td><td>GHS ' + parseFloat(t.UnitPrice || t.unitPrice || 0).toFixed(2) + '</td><td><strong>GHS ' + parseFloat(t.Total || t.total || 0).toFixed(2) + '</strong></td><td><span class="badge ' + ((t.Status || t.status) === 'Paid' ? 'badge-paid' : 'badge-pending') + '">' + (t.Status || t.status || 'Paid') + '</span></td></tr>';
+        });
+        tbody.innerHTML = html;
+    } else {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No transactions for this date</td></tr>';
+    }
+    
+    // Load attendance and expenses from localStorage
+    var attendance = JSON.parse(localStorage.getItem('milling_attendance')) || [];
+    var dayAtt = attendance.filter(function(a) { return (a.Date || a.date) === dateStr && (a.Present === 'true' || a.Present === true || a.present === true); });
+    document.getElementById('dayWorkers').textContent = dayAtt.length;
+    
+    var expenses = JSON.parse(localStorage.getItem('milling_expenses')) || [];
+    var dayExp = expenses.filter(function(e) { return (e.Date || e.date) === dateStr; }).reduce(function(s, e) { return s + (parseFloat(e.Amount || e.amount) || 0); }, 0);
+    document.getElementById('dayExpenses').textContent = 'GHS ' + dayExp.toLocaleString();
+}
     </script>
 </body>
 </html>
