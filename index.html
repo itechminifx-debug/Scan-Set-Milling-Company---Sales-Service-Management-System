@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scan Set Milling Company</title>
     <script src="auth.js"></script>
+    <script src="api_config.js"></script>
     <style>
         :root { --primary: #5d3a1a; --primary-light: #8b5e3c; --accent: #d4a574; --bg: #fdf6f0; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
@@ -35,9 +36,7 @@
         <div class="login-body">
             <div class="form-group">
                 <label>👤 Select User</label>
-                <select id="userSelect">
-                    <option value="">-- Loading users... --</option>
-                </select>
+                <select id="userSelect"><option value="">-- Loading users... --</option></select>
             </div>
             <div class="form-group">
                 <label>🔑 Password</label>
@@ -49,38 +48,27 @@
             © 2025 Scan Set Milling Company | <a href="#" onclick="goToAdmin(); return false;">⚙️ Admin Panel</a>
         </div>
     </div>
-
     <script>
-        function loadUsers() {
+        async function loadUsers() {
             var select = document.getElementById('userSelect');
-            var savedUsers = localStorage.getItem('milling_users');
-            var users = [];
-            if (savedUsers) { try { users = JSON.parse(savedUsers); } catch(e) { users = []; } }
+            var users = await apiGet('getUsers');
+            users = Array.isArray(users) ? users : [];
             if (users.length === 0) {
-                users = [
-                    { name: 'Administrator', password: '1234' },
-                    { name: 'Mr. Mensah', password: '1234' },
-                    { name: 'Owner', password: '1234' }
-                ];
-                localStorage.setItem('milling_users', JSON.stringify(users));
+                users = [{ Name: 'Administrator', Password: '1234' }, { Name: 'Mr. Mensah', Password: '1234' }, { Name: 'Owner', Password: '1234' }];
+                for (var i = 0; i < users.length; i++) { await apiPost('addUser', { name: users[i].Name, password: users[i].Password }); }
             }
             select.innerHTML = '<option value="">-- Select Your Name --</option>';
-            users.forEach(function(u) {
-                select.innerHTML += '<option value="' + u.name + '">' + u.name + '</option>';
-            });
+            users.forEach(function(u) { select.innerHTML += '<option value="' + (u.Name || u.name) + '">' + (u.Name || u.name) + '</option>'; });
         }
-
         window.onload = function() { loadUsers(); };
-
-        function login() {
+        async function login() {
             var user = document.getElementById('userSelect').value;
             var pass = document.getElementById('passwordInput').value;
             if (!user) { alert('Please select your name!'); return; }
-            var savedUsers = localStorage.getItem('milling_users');
-            var users = savedUsers ? JSON.parse(savedUsers) : [];
-            var foundUser = users.find(function(u) { return u.name === user; });
-            var validPassword = foundUser ? (foundUser.password || '1234') : '1234';
-            if (pass !== validPassword) { alert('Invalid password!'); return; }
+            var users = await apiGet('getUsers'); users = Array.isArray(users) ? users : [];
+            var found = users.find(function(u) { return (u.Name || u.name) === user; });
+            var validPass = found ? (found.Password || found.password || '1234') : '1234';
+            if (pass !== validPass) { alert('Invalid password!'); return; }
             localStorage.setItem('currentUser', user);
             if (user === 'Owner') { window.location.href = 'owner_view.html'; }
             else { window.location.href = 'dashboard.html'; }
