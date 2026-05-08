@@ -143,141 +143,151 @@
 
     <div class="toast" id="toast"></div>
 
-    <script>
-        var selectedMonth = new Date().getMonth();
-        var selectedYear = new Date().getFullYear();
+ <script src="api_config.js"></script>
+<script>
+    var selectedMonth = new Date().getMonth();
+    var selectedYear = new Date().getFullYear();
+    var allWorkers = [];
+    var allAttendance = [];
+    var allPayments = [];
 
-        window.onload = function() {
-            document.getElementById('payMonth').value = selectedMonth;
-            document.getElementById('payYear').value = selectedYear;
-            loadMonthSummary();
-        };
+    window.onload = async function() {
+        document.getElementById('payMonth').value = selectedMonth;
+        document.getElementById('payYear').value = selectedYear;
+        await loadData();
+    };
 
-        function getWorkers() {
-            var saved = localStorage.getItem('milling_workers');
-            return saved ? JSON.parse(saved) : [];
-        }
+    async function loadData() {
+        allWorkers = await apiGet('getWorkers');
+        allWorkers = Array.isArray(allWorkers) ? allWorkers : [];
+        
+        allAttendance = await apiGet('getAttendance');
+        allAttendance = Array.isArray(allAttendance) ? allAttendance : [];
+        
+        allPayments = await apiGet('getWorkerPayments');
+        allPayments = Array.isArray(allPayments) ? allPayments : [];
+        
+        loadMonthSummary();
+    }
 
-        function getAttendanceData() {
-            var saved = localStorage.getItem('milling_attendance');
-            return saved ? JSON.parse(saved) : [];
-        }
+    function getDaysInMonth(month, year) {
+        return new Date(year, month + 1, 0).getDate();
+    }
 
-        function getPaymentData() {
-            var saved = localStorage.getItem('milling_worker_payments');
-            return saved ? JSON.parse(saved) : [];
-        }
+    async function loadMonthSummary() {
+        selectedMonth = parseInt(document.getElementById('payMonth').value);
+        selectedYear = parseInt(document.getElementById('payYear').value);
 
-        function savePaymentData(data) {
-            localStorage.setItem('milling_worker_payments', JSON.stringify(data));
-        }
+        var daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+        var totalPayout = 0;
+        var paidCount = 0;
+        var unpaidCount = 0;
 
-        function getDaysInMonth(month, year) {
-            return new Date(year, month + 1, 0).getDate();
-        }
+        var tbody = document.getElementById('paymentTableBody');
+        var html = '';
 
-        function loadMonthSummary() {
-            selectedMonth = parseInt(document.getElementById('payMonth').value);
-            selectedYear = parseInt(document.getElementById('payYear').value);
+        allWorkers.forEach(function(w) {
+            var workerName = w.Name || w.name;
+            var dailyRate = parseFloat(w.DailyRate || w.dailyRate || 0);
 
-            var workers = getWorkers();
-            var attData = getAttendanceData();
-            var payData = getPaymentData();
-            var daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+            // Count days present in this month
+            var daysWorked = 0;
+            for (var d = 1; d <= daysInMonth; d++) {
+                var dateStr = new Date(selectedYear, selectedMonth, d).toLocaleDateString();
+                var record = allAttendance.find(function(a) {
+                    var aName = a.WorkerName || a.workerName || '';
+                    var aDate = a.Date || a.date || '';
+                    var present = a.Present === 'true' || a.Present === true || a.present === true;
+                    return aName === workerName && aDate === dateStr && present;
+                });
+                if (record) daysWorked++;
+            }
 
-            var totalPayout = 0;
-            var paidCount = 0;
-            var unpaidCount = 0;
-
-            var tbody = document.getElementById('paymentTableBody');
-            var html = '';
-
-            workers.forEach(function(w) {
-                // Count days worker was present in this month
-                var daysWorked = 0;
-                for (var d = 1; d <= daysInMonth; d++) {
-                    var dateStr = new Date(selectedYear, selectedMonth, d).toLocaleDateString();
-                    var record = attData.find(function(a) { return a.workerName === w.name && a.date === dateStr && a.present; });
-                    if (record) daysWorked++;
-                }
-
-                var totalPay = daysWorked * (w.dailyRate || 0);
-
-                // Check if already paid for this month
-                var monthLabel = getMonthName(selectedMonth) + ' ' + selectedYear;
-                var paidRecord = payData.find(function(p) { return p.workerName === w.name && p.month === monthLabel; });
-                var isPaid = paidRecord ? true : false;
-                var statusText = isPaid ? 'Paid' : 'Unpaid';
-                var badgeClass = isPaid ? 'badge-paid' : 'badge-unpaid';
-
-                if (isPaid) { paidCount++; totalPayout += paidRecord.amount; }
-                else { unpaidCount++; totalPayout += totalPay; }
-
-                html += '<tr>';
-                html += '<td><strong>' + w.name + '</strong></td>';
-                html += '<td>GHS ' + (w.dailyRate || 0).toFixed(2) + '</td>';
-                html += '<td>' + daysWorked + ' days</td>';
-                html += '<td><strong>GHS ' + totalPay.toFixed(2) + '</strong></td>';
-                html += '<td><span class="badge ' + badgeClass + '">' + statusText + '</span></td>';
-                html += '<td>' + (isPaid ? '<span style="color:#999;">Paid on ' + paidRecord.paidDate + '</span>' : '<button class="btn btn-success btn-sm" onclick="payWorker(\'' + w.name + '\', ' + daysWorked + ', ' + totalPay + ')">💵 Pay Now</button>') + '</td>';
-                html += '</tr>';
-            });
-
-            tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#999;">No workers found</td></tr>';
-
-            document.getElementById('totalPayout').textContent = 'GHS ' + totalPayout.toFixed(2);
-            document.getElementById('paymentStatus').textContent = paidCount + ' paid / ' + unpaidCount + ' unpaid';
-
-            // Load history
-            loadPaymentHistory();
-        }
-
-        function payWorker(name, days, amount) {
-            if (!confirm('Confirm payment of GHS ' + amount.toFixed(2) + ' to ' + name + ' for ' + days + ' days?')) return;
-
-            var payData = getPaymentData();
+            var totalPay = daysWorked * dailyRate;
             var monthLabel = getMonthName(selectedMonth) + ' ' + selectedYear;
 
-            // Remove any existing record for this worker/month
-            payData = payData.filter(function(p) { return !(p.workerName === name && p.month === monthLabel); });
-
-            // Add new payment record
-            payData.push({
-                workerName: name,
-                month: monthLabel,
-                daysWorked: days,
-                amount: amount,
-                paidDate: new Date().toLocaleDateString(),
-                timestamp: Date.now()
+            // Check if already paid
+            var paidRecord = allPayments.find(function(p) {
+                var pName = p.WorkerName || p.workerName || '';
+                var pMonth = p.Month || p.month || '';
+                return pName === workerName && pMonth === monthLabel;
             });
 
-            savePaymentData(payData);
-            loadMonthSummary();
-            showToast('✅ Paid GHS ' + amount.toFixed(2) + ' to ' + name);
-        }
+            var isPaid = paidRecord ? true : false;
+            var statusText = isPaid ? 'Paid' : 'Unpaid';
+            var badgeClass = isPaid ? 'badge-paid' : 'badge-unpaid';
 
-        function loadPaymentHistory() {
-            var payData = getPaymentData();
-            payData.sort(function(a, b) { return b.timestamp - a.timestamp; });
-            var recent = payData.slice(0, 15);
+            if (isPaid) {
+                paidCount++;
+                totalPayout += parseFloat(paidRecord.Amount || paidRecord.amount || 0);
+            } else {
+                unpaidCount++;
+                totalPayout += totalPay;
+            }
 
-            var tbody = document.getElementById('historyTableBody');
-            var html = '';
-            recent.forEach(function(p) {
-                html += '<tr><td>' + p.paidDate + '</td><td>' + p.workerName + '</td><td>' + p.month + '</td><td>' + p.daysWorked + ' days</td><td><strong>GHS ' + p.amount.toFixed(2) + '</strong></td></tr>';
-            });
-            tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#999;">No payments recorded</td></tr>';
-        }
+            html += '<tr>';
+            html += '<td><strong>' + workerName + '</strong></td>';
+            html += '<td>GHS ' + dailyRate.toFixed(2) + '</td>';
+            html += '<td>' + daysWorked + ' days</td>';
+            html += '<td><strong>GHS ' + totalPay.toFixed(2) + '</strong></td>';
+            html += '<td><span class="badge ' + badgeClass + '">' + statusText + '</span></td>';
+            html += '<td>' + (isPaid ? '<span style="color:#999;">Paid on ' + (paidRecord.PaidDate || paidRecord.paidDate || '') + '</span>' : '<button class="btn btn-success btn-sm" onclick="payWorker(\'' + workerName.replace(/'/g, "\\'") + '\', ' + daysWorked + ', ' + totalPay + ')">💵 Pay Now</button>') + '</td>';
+            html += '</tr>';
+        });
 
-        function getMonthName(monthIndex) {
-            var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-            return months[monthIndex];
-        }
+        tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#999;">No workers found</td></tr>';
 
-        function showToast(msg) {
-            var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
-            setTimeout(function() { t.style.display = 'none'; }, 2500);
-        }
-    </script>
+        document.getElementById('totalPayout').textContent = 'GHS ' + totalPayout.toFixed(2);
+        document.getElementById('paymentStatus').textContent = paidCount + ' paid / ' + unpaidCount + ' unpaid';
+
+        loadPaymentHistory();
+    }
+
+    async function payWorker(name, days, amount) {
+        if (!confirm('Confirm payment of GHS ' + amount.toFixed(2) + ' to ' + name + ' for ' + days + ' days?')) return;
+
+        var monthLabel = getMonthName(selectedMonth) + ' ' + selectedYear;
+        var paymentData = {
+            workerName: name,
+            month: monthLabel,
+            daysWorked: days,
+            amount: amount,
+            paidDate: new Date().toLocaleDateString()
+        };
+
+        await apiPost('addWorkerPayment', paymentData);
+        await loadData();
+        showToast('✅ Paid GHS ' + amount.toFixed(2) + ' to ' + name);
+    }
+
+    function loadPaymentHistory() {
+        var sorted = allPayments.slice().sort(function(a, b) {
+            return new Date(b.PaidDate || b.paidDate) - new Date(a.PaidDate || a.paidDate);
+        });
+        var recent = sorted.slice(0, 15);
+
+        var tbody = document.getElementById('historyTableBody');
+        var html = '';
+        recent.forEach(function(p) {
+            var paidDate = p.PaidDate || p.paidDate || '';
+            var name = p.WorkerName || p.workerName || '';
+            var month = p.Month || p.month || '';
+            var days = p.DaysWorked || p.daysWorked || '';
+            var amt = parseFloat(p.Amount || p.amount || 0).toFixed(2);
+            html += '<tr><td>' + paidDate + '</td><td>' + name + '</td><td>' + month + '</td><td>' + days + ' days</td><td><strong>GHS ' + amt + '</strong></td></tr>';
+        });
+        tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#999;">No payments recorded</td></tr>';
+    }
+
+    function getMonthName(index) {
+        var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        return months[index];
+    }
+
+    function showToast(msg) {
+        var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+        setTimeout(function() { t.style.display = 'none'; }, 2500);
+    }
+</script>
 </body>
 </html>
